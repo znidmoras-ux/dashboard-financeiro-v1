@@ -1,0 +1,7 @@
+# Para testar localmente construindo as imagens em vez de baixá-las:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+services:
+  backend:
+    build: ./backend
+  frontend:
+    build: ./frontend

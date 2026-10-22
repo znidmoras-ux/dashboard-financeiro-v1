@@ -1,0 +1,610 @@
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="mi logo">monitoring</span><div><b>Dashboard</b><small>Executivo</small></div></div>
+    <nav>
+      @for (t of tabs; track t.id) {
+        <button type="button" [class.on]="tab() === t.id" (click)="go(t.id)"><span class="mi">{{ t.icon }}</span><span class="lbl">{{ t.label }}</span></button>
+      }
+    </nav>
+    <div class="side-foot">
+      <small>Seus dados ficam salvos neste navegador. Todo número da tela pode ser editado.</small>
+      <button type="button" class="ghost danger" (click)="doReset()"><span class="mi">restart_alt</span>{{ confirmReset() ? 'Confirmar restauração' : 'Restaurar dados originais' }}</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <h1>{{ tab() === "geral" ? "Dashboard Executivo" : tabLabel() }}</h1>
+      <div class="top-r">
+        <label class="comp"><span>Competência</span>
+          <select id="competencia" [ngModel]="s.month()" (ngModelChange)="s.month.set($event)">
+            @for (m of s.months(); track m) { <option [value]="m">{{ monthLabel(m) }}</option> }
+          </select>
+        </label>
+        @if (s.mode() === 'server') {
+          <div class="sync" [title]="syncTitle()"><span class="dot ok"></span><span class="sync-t">Servidor conectado{{ s.status()?.pluggy ? ' · banco ' + ago(s.status()?.sync?.['pluggy']?.lastOk) : '' }}</span>
+            @if (s.status()?.pluggy) { <button type="button" class="icon-btn sm" (click)="s.syncNow()" [disabled]="s.syncing()" aria-label="Sincronizar banco agora"><span class="mi" [class.spin]="s.syncing()">sync</span></button> }
+          </div>
+        } @else if (s.mode() === 'local') {
+          <div class="sync" title="Sem servidor: os dados ficam salvos só neste navegador."><span class="dot"></span><span class="sync-t">Modo local</span></div>
+        }
+        <button type="button" class="icon-btn" (click)="setTheme()" [attr.aria-label]="'Tema: ' + s.theme()" title="Alternar tema"><span class="mi">{{ themeIcon() }}</span></button>
+      </div>
+    </header>
+
+    <!-- ================= VISÃO GERAL ================= -->
+    @if (tab() === 'geral') {
+      @let m = s.metrics();
+      <section class="kpis">
+        <article class="kpi"><h3>Vendas líquidas</h3><p class="big">{{ brl(m.net) }}</p><small>Bruto {{ brl(m.gross) }} · <span class="bad">-{{ brl(m.s.discounts) }} (desc/taxas)</span></small></article>
+        <article class="kpi" [class.neg]="m.profit < 0" [class.pos]="m.profit >= 0"><h3>Lucro líquido real</h3><p class="big" [class.bad]="m.profit < 0" [class.good]="m.profit >= 0">{{ brl(m.profit) }}</p><small>Margem líquida: <b>{{ pct(m.margin) }}</b></small></article>
+        <article class="kpi"><h3>CMV integrado</h3><p class="big">{{ pct(m.s.cmvPct) }}</p><small>Custo das fichas: {{ brl(m.cmv) }}</small></article>
+        <article class="kpi"><h3>Ticket médio líquido</h3><p class="big">{{ m.ticket ? brl(m.ticket) : '—' }}</p><small>{{ m.s.orders ? m.s.orders + ' pedidos processados' : 'Informe os pedidos na aba Vendas' }}</small></article>
+        <article class="kpi"><h3>Projeção do mês</h3><p class="big">{{ brl(m.projected) }}</p><small>Ritmo de {{ brl(m.runRate) }}/dia · lucro projetado <span [class.bad]="m.projectedProfit < 0" [class.good]="m.projectedProfit >= 0">{{ brl(m.projectedProfit) }}</span></small></article>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <h2><span class="mi">show_chart</span>Ponto de equilíbrio</h2>
+          <dl class="rows">
+            <div><dt>Custos fixos atuais</dt><dd>{{ brl(m.costs) }}</dd></div>
+            <div><dt>Faturamento mínimo necessário</dt><dd class="accent">{{ brl(m.breakeven) }}</dd></div>
+            <div><dt>Faturamento para a meta de lucro ({{ brl(s.cfg().targetProfit, 0) }})</dt><dd>{{ brl(m.target) }}</dd></div>
+          </dl>
+          <div class="meter" role="progressbar" [attr.aria-valuenow]="m.progress" aria-valuemin="0" aria-valuemax="100"><i [style.width.%]="m.progress" [class.ok]="m.progressRaw >= 100"></i></div>
+          <p class="meter-l"><span>{{ pct(m.progressRaw) }} atingido</span><span>{{ m.missing > 0 ? 'faltam ' + brl(m.missing) : 'meta superada' }}</span></p>
+        </article>
+        <article class="card">
+          <h2><span class="mi">language</span>Receita por canal de venda</h2>
+          @if (channelItems().length) {
+            <app-donut [items]="channelItems()" [colors]="PALETTE" centerTop="Líquido" [centerValue]="brl(m.net, 0)" label="Receita por canal"/>
+          } @else { <p class="empty">Nenhum canal com vendas. Adicione na aba Vendas.</p> }
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <h2><span class="mi">lightbulb</span>Leitura do mês</h2>
+          <ul class="insights">
+            @for (i of s.insights(); track i.text) { <li [class]="i.tone"><span class="mi">{{ i.icon }}</span><span>{{ i.text }}</span></li> }
+          </ul>
+        </article>
+        <article class="card">
+          <h2><span class="mi">casino</span>Chance de fechar o mês no azul</h2>
+          @if (s.sim(); as sm) {
+            <p class="prob" [class]="toneOf(sm.hit)">{{ pct(sm.hit * 100, 0) }}</p>
+            <p class="sub">Probabilidade de vender mais que {{ brl(m.breakeven, 0) }} até o dia {{ m.d.total }}, em 4.000 simulações a partir do ritmo diário do seu extrato.</p>
+            <dl class="rows compact">
+              <div><dt>Cenário pessimista (P10)</dt><dd>{{ brl(sm.p10, 0) }} <small [class.bad]="sm.profit(sm.p10) < 0">lucro {{ brl(sm.profit(sm.p10), 0) }}</small></dd></div>
+              <div><dt>Cenário provável (P50)</dt><dd>{{ brl(sm.p50, 0) }} <small [class.bad]="sm.profit(sm.p50) < 0">lucro {{ brl(sm.profit(sm.p50), 0) }}</small></dd></div>
+              <div><dt>Cenário otimista (P90)</dt><dd>{{ brl(sm.p90, 0) }} <small [class.bad]="sm.profit(sm.p90) < 0" [class.good]="sm.profit(sm.p90) >= 0">lucro {{ brl(sm.profit(sm.p90), 0) }}</small></dd></div>
+            </dl>
+          } @else { <p class="empty">Mês encerrado ou sem vendas. Selecione o mês atual para ver as probabilidades.</p> }
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="card"><h2><span class="mi">bar_chart</span>Vendas e lucro por mês</h2>
+          <app-columns [labels]="trendLabels()" [series]="trendSeries()" label="Vendas e lucro por mês"/></article>
+        <article class="card"><h2><span class="mi">swap_vert</span>Movimentação do extrato por mês</h2>
+          <app-columns [labels]="trendLabels()" [series]="bankSeries()" label="Entradas e saídas do extrato"/>
+          <p class="note">Exclui transferências entre contas próprias{{ s.cfg().excludeOwn ? '' : ' (desativado)' }}.</p></article>
+      </section>
+
+      <section class="grid two">
+        <article class="card"><h2><span class="mi">calendar_month</span>Entradas por dia · {{ monthLabel(s.month()) }}</h2>
+          <app-columns [labels]="dailyLabels()" [series]="dailySeries()" label="Entradas por dia" [title]="dayTitle"/></article>
+        <article class="card"><h2><span class="mi">date_range</span>Entradas por dia da semana</h2>
+          <app-columns [labels]="wdLabels" [series]="wdSeries()" label="Entradas por dia da semana"/></article>
+      </section>
+
+      <section class="grid two">
+        <article class="card"><h2><span class="mi">category</span>Saídas por categoria</h2>
+          <ul class="bars">@for (c of s.led().byCat; track c.k) {
+            <li><span>{{ c.k }}</span><div><i [style.width.%]="c.v / s.led().byCat[0].v * 100"></i></div><em>{{ brl(c.v, 0) }}</em></li>
+          } @empty { <li class="empty">Sem saídas no período.</li> }</ul></article>
+        <article class="card"><h2><span class="mi">storefront</span>Maiores destinos de pagamento</h2>
+          <ul class="bars">@for (c of s.led().parties; track c.k) {
+            <li><span>{{ c.k }}</span><div><i [style.width.%]="c.v / s.led().parties[0].v * 100"></i></div><em>{{ brl(c.v, 0) }}</em></li>
+          } @empty { <li class="empty">Sem saídas no período.</li> }</ul></article>
+      </section>
+    }
+
+    <!-- ================= VENDAS ================= -->
+    @if (tab() === 'vendas') {
+      @let m = s.metrics();
+      <section class="grid two">
+        <article class="card">
+          <h2><span class="mi">point_of_sale</span>Vendas de {{ monthLabel(s.month()) }}</h2>
+          @if (m.s.auto) { <p class="auto-note"><span class="mi">bolt</span>Valores recebidos automaticamente da Anota AI ({{ m.s.orders }} pedidos, cancelados fora). Para editar à mão, é preciso que o mês não tenha pedidos recebidos.</p> }
+          <table class="edit">
+            <thead><tr><th>Canal</th><th class="r">Receita líquida</th><th></th></tr></thead>
+            <tbody>
+              @for (c of m.s.channels; track c.id) {
+                <tr>
+                  <td><input type="text" [id]="'ch-n-' + c.id" [ngModel]="c.name" [disabled]="!!m.s.auto" (ngModelChange)="s.updChannel(s.month(), c.id, { name: $event })" aria-label="Nome do canal"/></td>
+                  <td class="r"><input type="number" step="0.01" min="0" [id]="'ch-v-' + c.id" [ngModel]="c.net" [disabled]="!!m.s.auto" (ngModelChange)="s.updChannel(s.month(), c.id, { net: num($event) })" aria-label="Receita líquida"/></td>
+                  <td class="x"><button type="button" class="icon-btn sm" [disabled]="!!m.s.auto" (click)="s.delChannel(s.month(), c.id)" aria-label="Remover canal"><span class="mi">delete</span></button></td>
+                </tr>
+              }
+            </tbody>
+            <tfoot><tr><td>Total líquido</td><td class="r">{{ brl(m.net) }}</td><td></td></tr></tfoot>
+          </table>
+          <button type="button" class="btn" [disabled]="!!m.s.auto" (click)="s.addChannel(s.month())"><span class="mi">add</span>Adicionar canal</button>
+        </article>
+        <article class="card">
+          <h2><span class="mi">tune</span>Parâmetros do mês</h2>
+          <div class="form">
+            <label>Descontos e taxas (R$)<input type="number" step="0.01" id="desc" [disabled]="!!m.s.auto" [ngModel]="m.s.discounts" (ngModelChange)="s.patchSales(s.month(), { discounts: num($event) })"/></label>
+            <label>Pedidos processados<input type="number" step="1" id="orders" [disabled]="!!m.s.auto" [ngModel]="m.s.orders" (ngModelChange)="s.patchSales(s.month(), { orders: num($event) })"/></label>
+            <label>CMV integrado (%)<input type="number" step="0.1" id="cmv" [ngModel]="m.s.cmvPct" (ngModelChange)="s.patchSales(s.month(), { cmvPct: num($event) })"/></label>
+          </div>
+          <dl class="rows compact">
+            <div><dt>Faturamento bruto</dt><dd>{{ brl(m.gross) }}</dd></div>
+            <div><dt>Descontos e taxas</dt><dd>{{ pct(m.discPct) }} do bruto</dd></div>
+            <div><dt>Ticket médio líquido</dt><dd>{{ m.ticket ? brl(m.ticket) : '—' }}</dd></div>
+            <div><dt>Margem de contribuição</dt><dd>{{ pct(m.contrib * 100) }}</dd></div>
+          </dl>
+          <div class="form inline">
+            <label>Nova competência<input type="month" id="novo-mes" [(ngModel)]="newMonth"/></label>
+            <button type="button" class="btn" (click)="addMonth()"><span class="mi">add</span>Criar mês</button>
+          </div>
+        </article>
+      </section>
+      <section class="card">
+        <h2><span class="mi">history</span>Histórico mensal</h2>
+        <div class="scroll"><table class="plain">
+          <thead><tr><th>Mês</th><th class="r">Vendas líquidas</th><th class="r">CMV</th><th class="r">Custos fixos</th><th class="r">Lucro real</th><th class="r">Entradas no extrato</th><th class="r">Saídas no extrato</th></tr></thead>
+          <tbody>@for (t of s.trend(); track t.m) {
+            <tr (click)="s.month.set(t.m)" class="click" [class.sel]="t.m === s.month()">
+              <td>{{ monthLabel(t.m) }}</td><td class="r">{{ brl(t.net) }}</td><td class="r">{{ brl(s.salesOf(t.m).channels.length ? t.net * s.salesOf(t.m).cmvPct / 100 : 0) }}</td><td class="r">{{ brl(s.costTotal()) }}</td>
+              <td class="r" [class.bad]="t.profit < 0" [class.good]="t.profit >= 0">{{ brl(t.profit) }}</td><td class="r">{{ brl(t.inflow) }}</td><td class="r">{{ brl(t.out) }}</td></tr>
+          }</tbody></table></div>
+        <p class="note">Meses anteriores usam a receita de iFood identificada no extrato (estimativa). Edite os canais para colocar o faturamento líquido real.</p>
+      </section>
+    }
+
+    <!-- ================= CUSTOS ================= -->
+    @if (tab() === 'custos') {
+      <section class="kpis three">
+        <article class="kpi"><h3>Pagamentos recebendo de fato</h3><p class="big">{{ brl(s.payActiveTotal()) }}</p><small>é o que sai do caixa hoje</small></article>
+        <article class="kpi" [class.neg]="s.payDeferredTotal() > 0"><h3>Pró-labore/salário não pago</h3><p class="big" [class.bad]="s.payDeferredTotal() > 0">{{ brl(s.payDeferredTotal()) }}</p><small>comprometido, acumulando como dívida</small></article>
+        <article class="kpi"><h3>Custos fixos</h3><p class="big">{{ brl(s.fixedTotal()) }}</p><small>{{ s.fixed().length }} itens</small></article>
+      </section>
+      <section class="kpis three">
+        <article class="kpi"><h3>Total da operação (caixa real)</h3><p class="big">{{ brl(planned()) }}</p><small>
+          <label class="check"><input type="checkbox" id="inc-pay" [ngModel]="s.cfg().includePayments" (ngModelChange)="patchCfg({ includePayments: $event })"/>Incluir pagamentos no ponto de equilíbrio</label></small></article>
+        <article class="kpi"><h3>Total comprometido (se todos recebessem)</h3><p class="big">{{ brl(s.fixedTotal() + s.payTotal()) }}</p><small>{{ s.pay().length }} pessoas na folha</small></article>
+        <article class="kpi"></article>
+      </section>
+      <section class="grid two">
+        <article class="card">
+          <h2><span class="mi">groups</span>Pagamentos</h2>
+          <table class="edit">
+            <thead><tr><th>Status</th><th>Tipo</th><th>Nome</th><th class="r">Valor</th><th></th></tr></thead>
+            <tbody>@for (p of s.pay(); track p.id) {
+              <tr>
+                <td><button type="button" class="pill" [class]="payTone(p)" (click)="togglePayReceiving(p)">{{ p.receiving ? 'Recebendo' : 'Não recebe' }}</button></td>
+                <td><select [id]="'p-r-' + p.id" [ngModel]="p.role" (ngModelChange)="s.upd(s.pay, p.id, { role: $event })" aria-label="Tipo"><option>SOCIO</option><option>OPERAÇÃO</option></select></td>
+                <td><input type="text" [id]="'p-n-' + p.id" [ngModel]="p.name" (ngModelChange)="s.upd(s.pay, p.id, { name: $event })" aria-label="Nome"/></td>
+                <td class="r"><input type="number" step="0.01" [id]="'p-v-' + p.id" [ngModel]="p.value" (ngModelChange)="s.upd(s.pay, p.id, { value: num($event) })" aria-label="Valor"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.pay, p.id)" aria-label="Remover"><span class="mi">delete</span></button></td></tr>
+            }</tbody>
+            <tfoot><tr><td colspan="3">Recebendo agora / Comprometido total</td><td class="r">{{ brl(s.payActiveTotal()) }} / {{ brl(s.payTotal()) }}</td><td></td></tr></tfoot>
+          </table>
+          <button type="button" class="btn" (click)="s.addPay()"><span class="mi">add</span>Adicionar pessoa</button>
+          <p class="note">Clique no status para marcar se a pessoa está recebendo de fato. Quem não está recebendo não entra no ponto de equilíbrio (caixa real), mas o valor continua contado como dívida de pró-labore/salário acumulada.</p>
+        </article>
+        <article class="card">
+          <h2><span class="mi">receipt_long</span>Custos fixos</h2>
+          <table class="edit">
+            <thead><tr><th>Fornecedor</th><th>Categoria</th><th class="r">Valor</th><th></th></tr></thead>
+            <tbody>@for (f of s.fixed(); track f.id) {
+              <tr>
+                <td><input type="text" [id]="'f-n-' + f.id" [ngModel]="f.name" (ngModelChange)="s.upd(s.fixed, f.id, { name: $event })" aria-label="Fornecedor"/></td>
+                <td><input type="text" list="fixcats" [id]="'f-c-' + f.id" [ngModel]="f.cat" (ngModelChange)="s.upd(s.fixed, f.id, { cat: $event })" aria-label="Categoria"/></td>
+                <td class="r"><input type="number" step="0.01" [id]="'f-v-' + f.id" [ngModel]="f.value" (ngModelChange)="s.upd(s.fixed, f.id, { value: num($event) })" aria-label="Valor"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.fixed, f.id)" aria-label="Remover"><span class="mi">delete</span></button></td></tr>
+            }</tbody>
+            <tfoot><tr><td colspan="2">Total custos fixos</td><td class="r">{{ brl(s.fixedTotal()) }}</td><td></td></tr></tfoot>
+          </table>
+          <datalist id="fixcats">@for (c of FIXED_CATS; track c) { <option [value]="c"></option> }</datalist>
+          <button type="button" class="btn" (click)="s.addFixed()"><span class="mi">add</span>Adicionar custo</button>
+        </article>
+      </section>
+      <section class="card">
+        <h2><span class="mi">request_quote</span>Contas a pagar</h2>
+        @let bs = s.billStats();
+        <div class="kpis three nested">
+          <article class="kpi" [class.neg]="bs.totalOverdue > 0"><h3>Vencido</h3><p class="big" [class.bad]="bs.totalOverdue > 0">{{ brl(bs.totalOverdue) }}</p><small>{{ bs.overdue.length }} boleto(s)</small></article>
+          <article class="kpi" [class.neg]="bs.gap > 0"><h3>Vence em 7 dias</h3><p class="big">{{ brl(bs.totalSoon) }}</p><small>repasses previstos no período: {{ brl(bs.payoutsSoon) }}</small></article>
+          <article class="kpi" [class.neg]="bs.gap > 0"><h3>Cobertura dos repasses</h3><p class="big" [class.bad]="bs.gap > 0" [class.good]="bs.gap <= 0">{{ bs.gap > 0 ? 'falta ' + brl(bs.gap) : 'cobre' }}</p><small>repasses previstos − boletos de 7 dias</small></article>
+        </div>
+        <div class="scroll">
+          <table class="edit bills">
+            <thead><tr><th>Status</th><th>Fornecedor</th><th class="r">Valor</th><th>Vencimento</th><th>Pago por</th><th>Observação</th><th></th></tr></thead>
+            <tbody>@for (b of s.bills(); track b.id) {
+              <tr>
+                <td><button type="button" class="pill" [class]="billTone(b)" (click)="togglePaid(b)">{{ billLabel(b) }}</button></td>
+                <td><input type="text" [id]="'b-f-' + b.id" [ngModel]="b.supplier" (ngModelChange)="s.upd(s.bills, b.id, { supplier: $event })" aria-label="Fornecedor"/></td>
+                <td class="r"><input type="number" step="0.01" min="0" [id]="'b-v-' + b.id" [ngModel]="b.amount" (ngModelChange)="s.upd(s.bills, b.id, { amount: num($event) })" aria-label="Valor"/></td>
+                <td><input type="date" [id]="'b-d-' + b.id" [ngModel]="b.dueDate" (ngModelChange)="s.upd(s.bills, b.id, { dueDate: $event })" aria-label="Vencimento"/></td>
+                <td><input type="text" class="w-bank" [id]="'b-p-' + b.id" [ngModel]="b.paidBy" (ngModelChange)="s.upd(s.bills, b.id, { paidBy: $event })" aria-label="Pago por" placeholder="banco / sócio"/></td>
+                <td><input type="text" [id]="'b-o-' + b.id" [ngModel]="b.note" (ngModelChange)="s.upd(s.bills, b.id, { note: $event })" aria-label="Observação"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.bills, b.id)" aria-label="Excluir conta"><span class="mi">delete</span></button></td>
+              </tr>
+            } @empty { <tr><td colspan="7" class="empty">Nenhuma conta lançada.</td></tr> }</tbody>
+          </table>
+        </div>
+        <button type="button" class="btn" (click)="s.addBill()"><span class="mi">add</span>Novo boleto</button>
+        <p class="note">Clique no status para marcar como pago ou reabrir. "Cobertura" compara o que vence nos próximos 7 dias com os repasses previstos no mesmo período — abaixo.</p>
+
+        <h2 class="mt"><span class="mi">payments</span>Repasses previstos</h2>
+        <div class="scroll">
+          <table class="edit">
+            <thead><tr><th>Data</th><th class="r">Valor</th><th>Origem</th><th></th></tr></thead>
+            <tbody>@for (p of s.payouts(); track p.id) {
+              <tr>
+                <td><input type="date" [id]="'py-d-' + p.id" [ngModel]="p.date" (ngModelChange)="s.upd(s.payouts, p.id, { date: $event })" aria-label="Data"/></td>
+                <td class="r"><input type="number" step="0.01" min="0" [id]="'py-v-' + p.id" [ngModel]="p.amount" (ngModelChange)="s.upd(s.payouts, p.id, { amount: num($event) })" aria-label="Valor"/></td>
+                <td><input type="text" [id]="'py-n-' + p.id" [ngModel]="p.note" (ngModelChange)="s.upd(s.payouts, p.id, { note: $event })" aria-label="Origem"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.payouts, p.id)" aria-label="Excluir repasse"><span class="mi">delete</span></button></td>
+              </tr>
+            } @empty { <tr><td colspan="4" class="empty">Nenhum repasse lançado.</td></tr> }</tbody>
+          </table>
+        </div>
+        <button type="button" class="btn" (click)="s.addPayout()"><span class="mi">add</span>Novo repasse</button>
+        <p class="note">O iFood paga cerca de 25 dias depois da venda, sempre às quartas. Lance aqui os valores do relatório de conciliação (Vendas → Receitas) conforme eles saem, para acompanhar se cobrem os boletos da semana.</p>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">local_shipping</span>Fornecedores</h2>
+        <div class="scroll">
+          <table class="edit">
+            <thead><tr><th>Fornecedor</th><th class="r">Prazo (dias)</th><th>Observação</th><th></th></tr></thead>
+            <tbody>@for (sp of s.suppliers(); track sp.id) {
+              <tr>
+                <td><input type="text" [id]="'sf-n-' + sp.id" [ngModel]="sp.name" (ngModelChange)="s.upd(s.suppliers, sp.id, { name: $event })" aria-label="Fornecedor"/></td>
+                <td class="r"><input type="number" min="0" [id]="'sf-t-' + sp.id" [ngModel]="sp.termDays" (ngModelChange)="s.upd(s.suppliers, sp.id, { termDays: num($event) })" aria-label="Prazo em dias"/></td>
+                <td><input type="text" [id]="'sf-o-' + sp.id" [ngModel]="sp.note" (ngModelChange)="s.upd(s.suppliers, sp.id, { note: $event })" aria-label="Observação"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.suppliers, sp.id)" aria-label="Remover"><span class="mi">delete</span></button></td>
+              </tr>
+            } @empty { <tr><td colspan="4" class="empty">Nenhum fornecedor cadastrado.</td></tr> }</tbody>
+          </table>
+        </div>
+        <button type="button" class="btn" (click)="s.addSupplier()"><span class="mi">add</span>Novo fornecedor</button>
+
+        <h3 class="mt">Gerar boleto a partir de um fornecedor</h3>
+        <div class="form">
+          <label>Fornecedor
+            <select [ngModel]="newBillSupplierId()" (ngModelChange)="newBillSupplierId.set($event ? num($event) : null)" aria-label="Fornecedor">
+              <option [ngValue]="null">Selecione...</option>
+              @for (sp of s.suppliers(); track sp.id) { <option [ngValue]="sp.id">{{ sp.name }} ({{ sp.termDays }} dias)</option> }
+            </select>
+          </label>
+          <label>Data do pedido<input type="date" [ngModel]="newBillOrderDate()" (ngModelChange)="newBillOrderDate.set($event)" aria-label="Data do pedido"/></label>
+          <label>Valor<input type="number" step="0.01" min="0" [ngModel]="newBillAmount()" (ngModelChange)="newBillAmount.set(num($event))" aria-label="Valor"/></label>
+          <label>Observação<input type="text" [ngModel]="newBillNote()" (ngModelChange)="newBillNote.set($event)" aria-label="Observação"/></label>
+        </div>
+        @if (newBillSupplierId()) { <p class="note">Vencimento calculado: <strong>{{ supplierDue() }}</strong></p> }
+        <button type="button" class="btn" [disabled]="!newBillSupplierId()" (click)="genBillFromSupplier()"><span class="mi">request_quote</span>Lançar boleto</button>
+        <p class="note">Cadastre o prazo de pagamento de cada fornecedor uma vez só — depois é só informar a data do pedido e o valor que o vencimento é calculado sozinho e o boleto já cai em "Contas a pagar", acima.</p>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">credit_card</span>Cartões de crédito</h2>
+        <div class="kpis three nested">
+          <article class="kpi"><h3>Faturas em aberto</h3><p class="big">{{ brl(cardInvoicesOpenTotal()) }}</p><small>{{ s.cardInvoices().length }} fatura(s) lançada(s)</small></article>
+          <article class="kpi"><h3>Parcelas em andamento/mês</h3><p class="big">{{ brl(s.cardMonthly()) }}</p><small>entra no custo fixo mensal</small></article>
+          <article class="kpi"><h3>Compras usadas</h3><p class="big">insumos da semana</p><small>cartão como alternativa ao boleto</small></article>
+        </div>
+
+        <h3 class="mt">Faturas</h3>
+        <div class="scroll">
+          <table class="edit bills">
+            <thead><tr><th>Status</th><th>Banco</th><th class="r">Total</th><th class="r">Mínimo</th><th>Vencimento</th><th></th></tr></thead>
+            <tbody>@for (c of s.cardInvoices(); track c.id) {
+              <tr>
+                <td><button type="button" class="pill" [class]="invoiceTone(c)" (click)="toggleInvoicePaid(c)">{{ invoiceLabel(c) }}</button></td>
+                <td><input type="text" [id]="'ci-b-' + c.id" [ngModel]="c.bank" (ngModelChange)="s.upd(s.cardInvoices, c.id, { bank: $event })" aria-label="Banco"/></td>
+                <td class="r"><input type="number" step="0.01" min="0" [id]="'ci-t-' + c.id" [ngModel]="c.total" (ngModelChange)="s.upd(s.cardInvoices, c.id, { total: num($event) })" aria-label="Total"/></td>
+                <td class="r"><input type="number" step="0.01" min="0" [id]="'ci-m-' + c.id" [ngModel]="c.minPayment" (ngModelChange)="s.upd(s.cardInvoices, c.id, { minPayment: num($event) })" aria-label="Mínimo"/></td>
+                <td><input type="date" [id]="'ci-d-' + c.id" [ngModel]="c.dueDate" (ngModelChange)="s.upd(s.cardInvoices, c.id, { dueDate: $event })" aria-label="Vencimento"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.cardInvoices, c.id)" aria-label="Excluir fatura"><span class="mi">delete</span></button></td>
+              </tr>
+            } @empty { <tr><td colspan="6" class="empty">Nenhuma fatura lançada.</td></tr> }</tbody>
+          </table>
+        </div>
+        <button type="button" class="btn" (click)="s.addCardInvoice()"><span class="mi">add</span>Nova fatura</button>
+
+        <h3 class="mt">Parcelas em andamento</h3>
+        <div class="scroll">
+          <table class="edit bills">
+            <thead><tr><th>Banco</th><th>Fornecedor</th><th>Descrição</th><th class="r">Valor da parcela</th><th>Parcela</th><th>Início</th><th></th></tr></thead>
+            <tbody>@for (c of s.cardInstallments(); track c.id) {
+              <tr [class.done]="installmentDone(c)">
+                <td><input type="text" [id]="'cp-b-' + c.id" [ngModel]="c.cardBank" (ngModelChange)="s.upd(s.cardInstallments, c.id, { cardBank: $event })" aria-label="Banco"/></td>
+                <td><input type="text" [id]="'cp-s-' + c.id" [ngModel]="c.supplier" (ngModelChange)="s.upd(s.cardInstallments, c.id, { supplier: $event })" aria-label="Fornecedor"/></td>
+                <td><input type="text" [id]="'cp-desc-' + c.id" [ngModel]="c.description" (ngModelChange)="s.upd(s.cardInstallments, c.id, { description: $event })" aria-label="Descrição"/></td>
+                <td class="r"><input type="number" step="0.01" min="0" [id]="'cp-v-' + c.id" [ngModel]="c.amount" (ngModelChange)="s.upd(s.cardInstallments, c.id, { amount: num($event) })" aria-label="Valor"/></td>
+                <td class="num-pair">
+                  <input type="number" min="1" class="w-xs" [id]="'cp-cur-' + c.id" [ngModel]="c.current" (ngModelChange)="s.upd(s.cardInstallments, c.id, { current: num($event) })" aria-label="Parcela atual"/>
+                  <span>/</span>
+                  <input type="number" min="1" class="w-xs" [id]="'cp-tot-' + c.id" [ngModel]="c.total" (ngModelChange)="s.upd(s.cardInstallments, c.id, { total: num($event) })" aria-label="Total de parcelas"/>
+                </td>
+                <td><input type="date" [id]="'cp-d-' + c.id" [ngModel]="c.startDate" (ngModelChange)="s.upd(s.cardInstallments, c.id, { startDate: $event })" aria-label="Início"/></td>
+                <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.cardInstallments, c.id)" aria-label="Excluir parcela"><span class="mi">delete</span></button></td>
+              </tr>
+            } @empty { <tr><td colspan="7" class="empty">Nenhuma parcela lançada.</td></tr> }</tbody>
+          </table>
+        </div>
+        <button type="button" class="btn" (click)="s.addCardInstallment()"><span class="mi">add</span>Nova parcela</button>
+        <p class="note">Compras de insumos feitas no cartão durante a semana (sem boleto) entram aqui como parcelas. O valor mensal das parcelas em andamento soma automaticamente no custo fixo, em "Para onde vai o dinheiro", no lugar do valor fixo que havia para o cartão.</p>
+      </section>
+
+      <section class="grid two">
+        <article class="card"><h2><span class="mi">donut_large</span>Para onde vai o dinheiro</h2>
+          <app-donut [items]="costItems()" [colors]="PALETTE" centerTop="Total" [centerValue]="brl(s.costTotal(), 0)" label="Custos por categoria"/></article>
+        <article class="card"><h2><span class="mi">flag</span>Meta e configuração</h2>
+          <div class="form">
+            <label>Meta de lucro mensal (R$)<input type="number" step="50" id="meta" [ngModel]="s.cfg().targetProfit" (ngModelChange)="patchCfg({ targetProfit: num($event) })"/></label>
+          </div>
+          <label class="check"><input type="checkbox" id="own" [ngModel]="s.cfg().excludeOwn" (ngModelChange)="patchCfg({ excludeOwn: $event })"/>Ignorar transferências entre contas próprias nas análises do extrato</label>
+          <dl class="rows compact">
+            <div><dt>Custo fixo por dia</dt><dd>{{ brl(s.costTotal() / s.metrics().d.total) }}</dd></div>
+            <div><dt>Custo fixo por hora (12h/dia)</dt><dd>{{ brl(s.costTotal() / s.metrics().d.total / 12) }}</dd></div>
+            <div><dt>Faturamento mínimo para a meta</dt><dd>{{ brl(s.metrics().target) }}</dd></div>
+          </dl>
+        </article>
+      </section>
+    }
+
+    <!-- ================= NOTAS DE INSUMOS ================= -->
+    @if (tab() === 'insumos') {
+      @let ss = supSum();
+      <section class="kpis four">
+        <article class="kpi"><h3>Total comprado</h3><p class="big">{{ brl(ss.total) }}</p><small>no filtro atual</small></article>
+        <article class="kpi"><h3>Itens lançados</h3><p class="big">{{ ss.items }}</p><small>{{ ss.notes }} notas · {{ ss.suppliers }} fornecedores</small></article>
+        <article class="kpi"><h3>CMV real (notas)</h3><p class="big" [class.bad]="conf().cmvReal !== null && conf().cmvReal! > conf().cmvInf">{{ conf().cmvReal !== null ? pct(conf().cmvReal!) : '—' }}</p><small>informado nas vendas: {{ pct(conf().cmvInf) }} · só no filtro por mês</small></article>
+        <article class="kpi"><h3>Notas x extrato</h3><p class="big">{{ conf().bank > 0 ? pct(conf().cov, 0) : '—' }}</p><small>notas {{ brl(conf().notes, 0) }} · extrato (compras) {{ brl(conf().bank, 0) }}</small></article>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">filter_alt</span>Filtros</h2>
+        <div class="filters">
+          <label class="search"><span class="mi">search</span><input type="search" id="i-busca" placeholder="Produto, fornecedor, marca ou nota" [ngModel]="sq()" (ngModelChange)="setS('sq', $event)"/></label>
+          <select id="i-per" [ngModel]="sPeriod()" (ngModelChange)="setS('sPeriod', $event)" aria-label="Período"><option value="month">Só {{ monthLabel(s.month()) }}</option><option value="all">Todo o período</option><option value="range">Intervalo de datas</option></select>
+          @if (sPeriod() === 'range') {
+            <input type="date" id="i-de" class="date" [ngModel]="sFrom()" (ngModelChange)="setS('sFrom', $event)" aria-label="De"/>
+            <input type="date" id="i-ate" class="date" [ngModel]="sTo()" (ngModelChange)="setS('sTo', $event)" aria-label="Até"/>
+          }
+          <select id="i-forn" [ngModel]="sSup()" (ngModelChange)="setS('sSup', $event)" aria-label="Fornecedor"><option value="">Todos os fornecedores</option>@for (o of optSup(); track o) { <option [value]="o">{{ o }}</option> }</select>
+          <select id="i-prod" [ngModel]="sProd()" (ngModelChange)="setS('sProd', $event)" aria-label="Produto"><option value="">Todos os produtos</option>@for (o of optProd(); track o) { <option [value]="o">{{ o }}</option> }</select>
+          <select id="i-marca" [ngModel]="sBrand()" (ngModelChange)="setS('sBrand', $event)" aria-label="Marca"><option value="">Todas as marcas</option>@for (o of optBrand(); track o) { <option [value]="o">{{ o }}</option> }</select>
+          <select id="i-un" [ngModel]="sUnit()" (ngModelChange)="setS('sUnit', $event)" aria-label="Unidade"><option value="">Todas as unidades</option>@for (o of optUnit(); track o) { <option [value]="o">{{ o }}</option> }</select>
+          <button type="button" class="btn" (click)="clearS()"><span class="mi">filter_alt_off</span>Limpar</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">inventory_2</span>Itens das notas</h2>
+        <div class="filters"><button type="button" class="btn primary" (click)="s.addSupply()"><span class="mi">add</span>Novo item</button></div>
+        <datalist id="dl-forn">@for (o of optSup(); track o) { <option [value]="o"></option> }</datalist>
+        <datalist id="dl-prod">@for (o of optProd(); track o) { <option [value]="o"></option> }</datalist>
+        <datalist id="dl-marca">@for (o of optBrand(); track o) { <option [value]="o"></option> }</datalist>
+        <datalist id="dl-un"><option value="un"></option><option value="kg"></option><option value="g"></option><option value="L"></option><option value="ml"></option><option value="cx"></option><option value="pct"></option><option value="fd"></option><option value="dz"></option></datalist>
+        <div class="scroll">
+          <table class="edit sup">
+            <thead><tr><th>Data</th><th>Nota</th><th>Fornecedor</th><th>Produto</th><th>Marca</th><th class="r">Qtde</th><th>Un</th><th class="r">Valor un. (R$)</th><th class="r">Total</th><th></th></tr></thead>
+            <tbody>
+              @for (r of supPage(); track r.id) {
+                <tr>
+                  <td><input type="date" [id]="'s-d-' + r.id" [ngModel]="r.date" (ngModelChange)="s.upd(s.supplies, r.id, { date: $event })" aria-label="Data"/></td>
+                  <td><input type="text" class="w-nota" [id]="'s-n-' + r.id" [ngModel]="r.invoice" (ngModelChange)="s.upd(s.supplies, r.id, { invoice: $event })" aria-label="Nota"/></td>
+                  <td><input type="text" list="dl-forn" [id]="'s-f-' + r.id" [ngModel]="r.supplier" (ngModelChange)="s.upd(s.supplies, r.id, { supplier: $event })" aria-label="Fornecedor"/></td>
+                  <td><input type="text" list="dl-prod" [id]="'s-p-' + r.id" [ngModel]="r.product" (ngModelChange)="s.upd(s.supplies, r.id, { product: $event })" aria-label="Produto"/></td>
+                  <td><input type="text" list="dl-marca" [id]="'s-m-' + r.id" [ngModel]="r.brand" (ngModelChange)="s.upd(s.supplies, r.id, { brand: $event })" aria-label="Marca"/></td>
+                  <td class="r"><input type="number" step="any" min="0" class="w-num" [id]="'s-q-' + r.id" [ngModel]="r.quantity" (ngModelChange)="s.upd(s.supplies, r.id, { quantity: num($event) })" aria-label="Quantidade"/></td>
+                  <td><input type="text" list="dl-un" class="w-un" [id]="'s-u-' + r.id" [ngModel]="r.unit" (ngModelChange)="s.upd(s.supplies, r.id, { unit: $event })" aria-label="Unidade"/></td>
+                  <td class="r"><input type="number" step="any" min="0" class="w-num" [id]="'s-v-' + r.id" [ngModel]="r.price" (ngModelChange)="s.upd(s.supplies, r.id, { price: num($event) })" aria-label="Valor unitário"/></td>
+                  <td class="r tot">{{ brl(total(r)) }}</td>
+                  <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.supplies, r.id)" aria-label="Excluir item"><span class="mi">delete</span></button></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="10" class="empty">Nenhum item neste filtro. Use "Novo item" ou cole as linhas das notas na área de importação abaixo.</td></tr>
+              }
+            </tbody>
+            <tfoot><tr><td colspan="8">Total do filtro</td><td class="r">{{ brl(ss.total) }}</td><td></td></tr></tfoot>
+          </table>
+        </div>
+        <div class="pager">
+          <button type="button" class="icon-btn sm" [disabled]="sPage() === 0" (click)="sPage.set(sPage() - 1)" aria-label="Página anterior"><span class="mi">chevron_left</span></button>
+          <span>Página {{ Math.min(sPage(), supPages() - 1) + 1 }} de {{ supPages() }}</span>
+          <button type="button" class="icon-btn sm" [disabled]="sPage() >= supPages() - 1" (click)="sPage.set(sPage() + 1)" aria-label="Próxima página"><span class="mi">chevron_right</span></button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">balance</span>Balancete de compras</h2>
+        <div class="filters">
+          <span class="note">Agrupar por</span>
+          @for (g of GROUPS; track g.id) { <button type="button" class="chip" [class.on]="group() === g.id" (click)="setS('group', g.id)">{{ g.label }}</button> }
+        </div>
+        <div class="scroll"><table class="plain bal">
+          <thead><tr><th>{{ group() === 'month' ? 'Mês' : group() === 'product' ? 'Produto · un' : group() === 'supplier' ? 'Fornecedor' : group() === 'brand' ? 'Marca' : 'Unidade' }}</th>
+            <th class="r">Itens</th>@if (group() === 'product' || group() === 'unit') { <th class="r">Qtde</th> }<th class="r">Total (R$)</th><th class="r">% do total</th>
+            @if (group() === 'product') { <th class="r">Preço médio</th><th class="r">Menor</th><th class="r">Maior</th><th class="r">Último</th><th class="r">Variação</th> }</tr></thead>
+          <tbody>@for (b of balancete(); track b.k) {
+            <tr><td>{{ b.k }}</td><td class="r">{{ b.n }}</td>@if (group() === 'product' || group() === 'unit') { <td class="r">{{ qty(b.qty) }}</td> }
+              <td class="r">{{ brl(b.total) }}</td>
+              <td class="r pctcell"><span class="pbar"><i [style.width.%]="b.share"></i></span>{{ pct(b.share) }}</td>
+              @if (group() === 'product') {
+                <td class="r">{{ b.avg ? brl(b.avg) : '—' }}</td><td class="r">{{ b.min ? brl(b.min) : '—' }}</td><td class="r">{{ b.max ? brl(b.max) : '—' }}</td><td class="r">{{ b.last ? brl(b.last) : '—' }}</td>
+                <td class="r" [class.bad]="b.varPct !== null && b.varPct > 0" [class.good]="b.varPct !== null && b.varPct < 0">{{ b.varPct === null ? '—' : (b.varPct > 0 ? '+' : '') + pct(b.varPct) }}</td>
+              }
+            </tr>
+          } @empty { <tr><td colspan="9" class="empty">Sem dados para o filtro atual.</td></tr> }</tbody>
+          <tfoot><tr><td>Total</td><td class="r">{{ ss.items }}</td>@if (group() === 'product' || group() === 'unit') { <td></td> }<td class="r">{{ brl(ss.total) }}</td><td class="r">100%</td>@if (group() === 'product') { <td colspan="5"></td> }</tr></tfoot>
+        </table></div>
+        <dl class="rows compact">
+          <div><dt>Compras nas notas (período do filtro de datas)</dt><dd>{{ brl(conf().notes) }}</dd></div>
+          <div><dt>Saídas "Compras / estoque / operação" no extrato</dt><dd>{{ brl(conf().bank) }}</dd></div>
+          <div><dt>Diferença (notas - extrato)</dt><dd [class.bad]="conf().diff < 0" [class.good]="conf().diff > 0">{{ brl(conf().diff) }}</dd></div>
+        </dl>
+        <p class="note">Diferença negativa quer dizer que há compras no extrato sem nota lançada. A coluna "Variação" compara o primeiro e o último preço do produto no filtro.</p>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">upload_file</span>Importar várias linhas</h2>
+        <p class="note">Cole linhas copiadas de uma planilha ou escolha um arquivo .csv/.txt. Colunas, nesta ordem, separadas por tabulação ou ponto e vírgula: <b>data; fornecedor; produto; marca; quantidade; un; valor unitário; nota (opcional)</b>. Datas em dd/mm/aaaa ou aaaa-mm-dd; decimais com vírgula.</p>
+        <textarea id="i-import" rows="5" [(ngModel)]="importText" placeholder="05/10/2026;Verona;Queijo mussarela;Tirolez;5;kg;38,90;1234"></textarea>
+        <div class="filters">
+          <button type="button" class="btn primary" (click)="doImport()"><span class="mi">playlist_add</span>Importar</button>
+          <label class="btn file"><span class="mi">folder_open</span>Escolher arquivo<input type="file" id="i-file" accept=".csv,.txt,.tsv" (change)="readFile($event)"/></label>
+          @if (importMsg()) { <span class="note" role="status">{{ importMsg() }}</span> }
+        </div>
+      </section>
+    }
+
+    <!-- ================= EXTRATO ================= -->
+    @if (tab() === 'extrato') {
+      <section class="kpis three">
+        <article class="kpi"><h3>Entradas filtradas</h3><p class="big good">{{ brl(sum().i) }}</p><small>{{ rows().length }} lançamentos</small></article>
+        <article class="kpi"><h3>Saídas filtradas</h3><p class="big bad">{{ brl(sum().o) }}</p></article>
+        <article class="kpi"><h3>Saldo do filtro</h3><p class="big" [class.bad]="sum().n < 0" [class.good]="sum().n >= 0">{{ brl(sum().n) }}</p></article>
+      </section>
+      <section class="card">
+        <div class="filters">
+          <label class="search"><span class="mi">search</span><input type="search" id="busca" placeholder="Buscar descrição, banco ou categoria" [ngModel]="q()" (ngModelChange)="setF('q', $event)"/></label>
+          <select id="f-nat" [ngModel]="nat()" (ngModelChange)="setF('nat', $event)" aria-label="Natureza"><option value="all">Entradas e saídas</option><option value="in">Só entradas</option><option value="out">Só saídas</option></select>
+          <select id="f-cat" [ngModel]="catF()" (ngModelChange)="setF('catF', $event)" aria-label="Categoria"><option value="all">Todas as categorias</option>@for (c of CATS; track c) { <option [value]="c">{{ c }}</option> }</select>
+          <select id="f-scope" [ngModel]="scope()" (ngModelChange)="setF('scope', $event)" aria-label="Período"><option value="month">Só {{ monthLabel(s.month()) }}</option><option value="all">Todo o período</option></select>
+          <button type="button" class="btn primary" (click)="s.addTx()"><span class="mi">add</span>Novo lançamento</button>
+        </div>
+        <div class="scroll">
+          <table class="edit tx">
+            <thead><tr><th>Data</th><th>Banco</th><th>Descrição</th><th>Categoria</th><th class="r">Valor (R$)</th><th></th></tr></thead>
+            <tbody>
+              @for (t of pageRows(); track t.id) {
+                <tr [class.own]="t.cat === OWN">
+                  <td><input type="date" [id]="'t-d-' + t.id" [ngModel]="t.date" (ngModelChange)="s.upd(s.tx, t.id, { date: $event })" aria-label="Data"/></td>
+                  <td><input type="text" class="w-bank" [id]="'t-b-' + t.id" [ngModel]="t.bank" (ngModelChange)="s.upd(s.tx, t.id, { bank: $event })" aria-label="Banco"/></td>
+                  <td><input type="text" [id]="'t-s-' + t.id" [ngModel]="t.desc" (ngModelChange)="s.upd(s.tx, t.id, { desc: $event })" aria-label="Descrição"/></td>
+                  <td><select [id]="'t-c-' + t.id" [ngModel]="t.cat" (ngModelChange)="s.upd(s.tx, t.id, { cat: $event })" aria-label="Categoria">
+                    @for (c of CATS; track c) { <option [value]="c">{{ c }}</option> }
+                    @if (!CATS.includes(t.cat)) { <option [value]="t.cat">{{ t.cat }}</option> }</select></td>
+                  <td class="r val"><button type="button" class="sgn" [class.in]="t.value > 0" (click)="flip(t)" [attr.aria-label]="t.value > 0 ? 'Entrada, trocar para saída' : 'Saída, trocar para entrada'"><span class="mi">{{ t.value > 0 ? 'south_west' : 'north_east' }}</span></button>
+                    <input type="number" step="0.01" [id]="'t-v-' + t.id" [ngModel]="Math.abs(t.value)" (ngModelChange)="signed(t, $event)" aria-label="Valor"/></td>
+                  <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.tx, t.id)" aria-label="Excluir lançamento"><span class="mi">delete</span></button></td>
+                </tr>
+              } @empty { <tr><td colspan="6" class="empty">Nenhum lançamento encontrado.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <button type="button" class="icon-btn sm" [disabled]="page() === 0" (click)="page.set(page() - 1)" aria-label="Página anterior"><span class="mi">chevron_left</span></button>
+          <span>Página {{ Math.min(page(), pages() - 1) + 1 }} de {{ pages() }}</span>
+          <button type="button" class="icon-btn sm" [disabled]="page() >= pages() - 1" (click)="page.set(page() + 1)" aria-label="Próxima página"><span class="mi">chevron_right</span></button>
+        </div>
+      </section>
+      @if (s.mode() === 'server') {
+        <section class="card">
+          <h2><span class="mi">rule</span>Regras de classificação</h2>
+          <p class="note">Quando a descrição de um lançamento contém o texto da regra, ele recebe a categoria. Vale para os lançamentos novos do banco e para os já existentes que você não categorizou à mão.</p>
+          <div class="filters">
+            <label class="search"><span class="mi">text_fields</span><input type="text" id="regra-texto" placeholder="Texto na descrição (ex.: MUFFATO)" [(ngModel)]="rulePattern"/></label>
+            <select id="regra-cat" [(ngModel)]="ruleCat" aria-label="Categoria da regra">@for (c of CATS; track c) { <option [value]="c">{{ c }}</option> }</select>
+            <button type="button" class="btn primary" (click)="addRule()"><span class="mi">add</span>Criar regra</button>
+            <button type="button" class="btn" (click)="s.applyRules()"><span class="mi">autorenew</span>Reaplicar a todos</button>
+          </div>
+          <div class="scroll"><table class="plain">
+            <thead><tr><th>Texto</th><th>Categoria</th><th></th></tr></thead>
+            <tbody>@for (r of s.rules(); track r.id) {
+              <tr><td>{{ r.pattern }}</td><td>{{ r.category }}</td><td class="x"><button type="button" class="icon-btn sm" (click)="s.delRule(r.id)" aria-label="Excluir regra"><span class="mi">delete</span></button></td></tr>
+            }</tbody></table></div>
+        </section>
+      }
+    }
+
+    <!-- ================= PROJEÇÕES ================= -->
+    @if (tab() === 'projecoes') {
+      @let m = s.metrics();
+      <section class="grid two">
+        <article class="card">
+          <h2><span class="mi">casino</span>Simulação de Monte Carlo · {{ monthLabel(s.month()) }}</h2>
+          @if (s.sim(); as sm) {
+            <p class="prob" [class]="toneOf(sm.hit)">{{ pct(sm.hit * 100, 1) }}</p>
+            <p class="sub">de chance de superar o ponto de equilíbrio de {{ brl(m.breakeven, 0) }}. Restam {{ m.d.remaining }} dias; cada dia sorteia um dia real do seu extrato, ajustado ao ritmo de {{ brl(m.runRate) }}/dia.</p>
+            <app-columns [labels]="histLabels()" [series]="histSeries()" label="Distribuição do faturamento final" [fmt]="pctFmt" [title]="histTitle"/>
+            <p class="note">Barras verdes superam o ponto de equilíbrio. Eixo: faturamento final do mês em R$ mil; altura: probabilidade.</p>
+            <button type="button" class="btn" (click)="s.seed.set(s.seed() + 1)"><span class="mi">refresh</span>Simular novamente</button>
+          } @else { <p class="empty">A simulação vale para o mês em andamento com vendas lançadas. Selecione {{ monthLabel(s.todayMonth) }} na competência.</p> }
+        </article>
+        <article class="card">
+          <h2><span class="mi">stacked_line_chart</span>Faixas de resultado</h2>
+          @if (s.sim(); as sm) {
+            <dl class="rows">
+              <div><dt>Faturamento P10</dt><dd>{{ brl(sm.p10, 0) }}</dd></div>
+              <div><dt>Faturamento P50 (mediana)</dt><dd>{{ brl(sm.p50, 0) }}</dd></div>
+              <div><dt>Faturamento P90</dt><dd>{{ brl(sm.p90, 0) }}</dd></div>
+              <div><dt>Lucro P10</dt><dd [class.bad]="sm.profit(sm.p10) < 0">{{ brl(sm.profit(sm.p10), 0) }}</dd></div>
+              <div><dt>Lucro P50</dt><dd [class.bad]="sm.profit(sm.p50) < 0">{{ brl(sm.profit(sm.p50), 0) }}</dd></div>
+              <div><dt>Lucro P90</dt><dd [class.bad]="sm.profit(sm.p90) < 0" [class.good]="sm.profit(sm.p90) >= 0">{{ brl(sm.profit(sm.p90), 0) }}</dd></div>
+            </dl>
+          }
+          <dl class="rows">
+            <div><dt>Vender por dia até o fim do mês</dt><dd>{{ brl(m.needPerDay) }}</dd></div>
+            <div><dt>Pedidos por dia necessários</dt><dd>{{ m.needOrdersDay ? n1(m.needOrdersDay) : '—' }}</dd></div>
+            <div><dt>Pedidos por dia hoje</dt><dd>{{ m.ordersPerDay ? n1(m.ordersPerDay) : '—' }}</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">science</span>E se...? Simulador de cenário</h2>
+        @let c = scn();
+        <div class="sliders">
+          <label>Pedidos por dia <b>{{ n1(c.orders) }}</b><input type="range" min="0" max="40" step="0.5" id="sl-o" [ngModel]="c.orders" (ngModelChange)="setOv('orders', $event)"/></label>
+          <label>Ticket médio líquido <b>{{ brl(c.ticket) }}</b><input type="range" min="10" max="150" step="1" id="sl-t" [ngModel]="c.ticket" (ngModelChange)="setOv('ticket', $event)"/></label>
+          <label>CMV <b>{{ pct(c.cmv) }}</b><input type="range" min="10" max="70" step="0.5" id="sl-c" [ngModel]="c.cmv" (ngModelChange)="setOv('cmv', $event)"/></label>
+          <label>Redução de custos fixos <b>{{ pct(c.cut, 0) }}</b><input type="range" min="0" max="50" step="1" id="sl-k" [ngModel]="c.cut" (ngModelChange)="setOv('cut', $event)"/></label>
+          <label>Dias de operação <b>{{ c.days }}</b><input type="range" min="1" max="31" step="1" id="sl-d" [ngModel]="c.days" (ngModelChange)="setOv('days', $event)"/></label>
+        </div>
+        <div class="kpis four">
+          <article class="kpi"><h3>Vendas líquidas</h3><p class="big">{{ brl(c.net, 0) }}</p></article>
+          <article class="kpi" [class.neg]="c.profit < 0"><h3>Lucro</h3><p class="big" [class.bad]="c.profit < 0" [class.good]="c.profit >= 0">{{ brl(c.profit, 0) }}</p><small>Margem {{ pct(c.margin) }}</small></article>
+          <article class="kpi"><h3>Equilíbrio</h3><p class="big">{{ brl(c.beNet, 0) }}</p><small>com custos de {{ brl(c.costs, 0) }}</small></article>
+          <article class="kpi"><h3>Pedidos/dia no equilíbrio</h3><p class="big">{{ n1(c.beOrders) }}</p></article>
+        </div>
+        <button type="button" class="btn" (click)="resetOv()"><span class="mi">undo</span>Voltar aos números reais</button>
+      </section>
+    }
+
+    <!-- ================= LOGS/ATUALIZAÇÕES ================= -->
+    @if (tab() === 'logs') {
+      <section class="card">
+        <h2><span class="mi">dns</span>Versão do sistema</h2>
+        <dl class="rows compact">
+          <div><dt>Ambiente</dt><dd>{{ s.appVersion.source }}</dd></div>
+          <div><dt>Tag/versão</dt><dd>{{ s.appVersion.tag }}</dd></div>
+          <div><dt>Última atualização deste painel</dt><dd>{{ s.appVersion.updatedAt }}</dd></div>
+        </dl>
+        <p class="note">Depois que o deploy automático (GitHub Actions → GHCR → servidor) estiver ativo, esta seção passa a mostrar a versão/commit publicado de verdade.</p>
+      </section>
+
+      <section class="card">
+        <h2><span class="mi">history</span>Histórico de lançamentos e correções</h2>
+        <div class="scroll">
+          <table class="edit">
+            <thead><tr><th>Data</th><th>Área</th><th>O que mudou</th></tr></thead>
+            <tbody>@for (l of s.changelog(); track l.id) {
+              <tr><td>{{ l.date }}</td><td><span class="chip tag">{{ l.area }}</span></td><td>{{ l.description }}</td></tr>
+            } @empty { <tr><td colspan="3" class="empty">Nenhum registro ainda.</td></tr> }</tbody>
+          </table>
+        </div>
+        <p class="note">Toda correção ou lançamento importante feito no dashboard fica registrado aqui, com data — serve de auditoria do que mudou no caixa ao longo do tempo.</p>
+      </section>
+    }
+    <footer class="foot">Equilíbrio = custos fixos ÷ (1 − CMV%). Lucro real = vendas líquidas − CMV − custos fixos.</footer>
+  </main>
+</div>

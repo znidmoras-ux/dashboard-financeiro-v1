@@ -1,0 +1,84 @@
+name: CI
+
+# Roda em todo push e em pull requests. Nenhuma etapa pode ser pulada.
+on:
+  push:
+    branches-ignore: [main]   # na main, quem chama o CI é o workflow de deploy (evita rodar duas vezes)
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  segredos:
+    name: Varredura de segredos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Falha se existir .env versionado
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "::error::Arquivo .env versionado. Remova do Git e troque as chaves."; exit 1
+          fi
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  backend:
+    name: Backend (testes com Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD || 'ci-only-password' }}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Testes
+        run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://ci_user:${{ secrets.CI_DB_PASSWORD || 'ci-only-password' }}@localhost:5432/testdb
+      - name: Auditoria de dependências
+        run: npm audit --omit=dev --audit-level=high
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx ng build
+      - name: Auditoria de dependências
+        run: npm audit --omit=dev --audit-level=high
+
+  compose:
+    name: Valida docker-compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: POSTGRES_PASSWORD=x IMAGE_PREFIX=ghcr.io/x/y docker compose config -q

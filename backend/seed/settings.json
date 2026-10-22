@@ -1,0 +1,26 @@
+{
+  "fixed": [
+    {"id":1,"name":"SANEPAR","cat":"AGUA","value":150},
+    {"id":2,"name":"COPEL","cat":"ENERGIA","value":550},
+    {"id":3,"name":"CONECTIVA","cat":"INTERNET","value":100},
+    {"id":4,"name":"ANOTA AI","cat":"SISTEMA","value":79.9},
+    {"id":5,"name":"IFOOD MENSALIDADE","cat":"SISTEMA","value":130},
+    {"id":6,"name":"EMPRESTIMO","cat":"DIVIDAS","value":360},
+    {"id":7,"name":"CARTAO MAGAZINE","cat":"DIVIDAS","value":680},
+    {"id":8,"name":"TUNA PAGAMENTOS","cat":"SISTEMA","value":79.99},
+    {"id":9,"name":"GUIA DAS","cat":"GOVERNO","value":82.9}
+  ],
+  "pay": [
+    {"id":1,"role":"SOCIO","name":"VALTER","value":1500},
+    {"id":2,"role":"OPERAÇÃO","name":"ALDO","value":1300},
+    {"id":3,"role":"SOCIO","name":"RODRIGO","value":1500},
+    {"id":4,"role":"OPERAÇÃO","name":"DIRLETE","value":1300},
+    {"id":5,"role":"OPERAÇÃO","name":"NICOLLY","value":280}
+  ],
+  "sales": [
+    {"month":"2026-10","discounts":399.38,"orders":88,"cmvPct":38.5,"channels":[{"id":1,"name":"Anota AI","net":1733.75},{"id":2,"name":"iFood","net":3796.62}]},
+    {"month":"2026-09","discounts":0,"orders":0,"cmvPct":38.5,"channels":[{"id":3,"name":"iFood (estimado do extrato)","net":3552.5}]},
+    {"month":"2026-08","discounts":0,"orders":0,"cmvPct":38.5,"channels":[{"id":4,"name":"iFood (estimado do extrato)","net":2008.91}]}
+  ],
+  "cfg": {"includePayments": true, "targetProfit": 0, "excludeOwn": true, "fees": {"iFood": 0}}
+}

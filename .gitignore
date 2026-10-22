@@ -1,0 +1,16 @@
+# Segredos: jamais versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+authkey*
+secrets*
+
+# Dependências e builds
+node_modules/
+dist/
+.angular/
+backups/
+*.log

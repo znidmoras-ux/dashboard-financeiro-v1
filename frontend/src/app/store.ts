@@ -93,6 +93,7 @@ const SEED_SUPPLIERS: Supplier[] = [
 // Histórico de lançamentos/correções feitos no dashboard — toda vez que um dado financeiro for criado, editado
 // ou corrigido por aqui, registra uma linha. Mais recente primeiro.
 const SEED_CHANGELOG: ChangeLogEntry[] = [
+  { id: 0, date: '2026-10-23', area: 'Infra', description: 'Código conectado ao GitHub (znidmoras-ux/dashboard-financeiro-v1) — primeiro push feito, CI rodando (build, testes, validação do docker-compose e varredura de segredos passando).' },
   { id: 1, date: '2026-10-22', area: 'Fornecedores', description: 'Prazos confirmados: Oesa 21 dias, Marchi 7 dias.' },
   { id: 2, date: '2026-10-22', area: 'Contas a pagar', description: 'Boleto Oesa corrigido de R$486,40 (estimado) para R$507,48 (real), vencido em 21/10.' },
   { id: 3, date: '2026-10-22', area: 'Contas a pagar', description: 'Lançado boleto Oesa de R$641 (20/10) como pago — quitado por outro meio, não pelo Pix pessoal de R$527 como se pensava antes.' },

@@ -21,7 +21,9 @@ services:
   backend:
     image: ${IMAGE_PREFIX:?defina IMAGE_PREFIX no .env}-backend:${TAG:-latest}
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false   # ausente em CI (nunca commitado); obrigatório de fato no servidor via .env.example
     environment:
       POSTGRES_HOST: db
       POSTGRES_DB: dashboard

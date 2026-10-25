@@ -63,7 +63,16 @@ cd "$APP"
 GU="$(get GHCR_USER || true)"; GT="$(get GHCR_TOKEN || true)"
 if [ -n "$GT" ]; then printf '%s' "$GT" | docker login ghcr.io -u "$GU" --password-stdin; fi
 PROFILE=()
-[ "$(get WHATSAPP_ENABLED || true)" = "true" ] && PROFILE=(--profile whatsapp)
+if [ "$(get WHATSAPP_ENABLED || true)" = "true" ]; then
+  getenv() { grep -E "^$1=" "$APP/.env" | head -1 | cut -d= -f2-; }
+  EK="$(getenv EVOLUTION_API_KEY || true)"; EP="$(getenv EVOLUTION_DB_PASSWORD || true)"
+  if [ -z "$EK" ] || [ "$EK" = "troque-me" ] || [ -z "$EP" ] || [ "$EP" = "troque-me" ]; then
+    echo "WHATSAPP_ENABLED=true mas EVOLUTION_API_KEY/EVOLUTION_DB_PASSWORD não estão definidos em $APP/.env."
+    echo "Gere com: openssl rand -hex 24 (para cada um) e preencha no .env antes de rodar de novo."
+    exit 1
+  fi
+  PROFILE=(--profile whatsapp)
+fi
 docker compose "${PROFILE[@]}" pull
 docker compose "${PROFILE[@]}" up -d --remove-orphans
 [ -n "$GT" ] && docker logout ghcr.io >/dev/null || true

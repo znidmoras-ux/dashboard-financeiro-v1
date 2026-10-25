@@ -77,10 +77,13 @@ services:
     environment:
       SERVER_URL: http://127.0.0.1:8081
       AUTHENTICATION_TYPE: apikey
-      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?defina EVOLUTION_API_KEY no .env}
+      # Sem ":?erro" de propósito: essas vars só existem de fato quando WHATSAPP_ENABLED=true no .env.
+      # Um ":?erro" aqui quebraria o "docker compose config"/"up" de QUALQUER instalação (mesmo sem
+      # o perfil whatsapp ativo), porque o Compose interpola todos os serviços antes de filtrar por profile.
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-troque-me}
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}@evolution-db:5432/evolution
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD:-troque-me}@evolution-db:5432/evolution
       CACHE_REDIS_ENABLED: "true"
       CACHE_REDIS_URI: redis://evolution-redis:6379
     volumes:
@@ -98,7 +101,7 @@ services:
     environment:
       POSTGRES_DB: evolution
       POSTGRES_USER: evolution
-      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:-troque-me}
     volumes:
       - evolution_pgdata:/var/lib/postgresql/data
     healthcheck:

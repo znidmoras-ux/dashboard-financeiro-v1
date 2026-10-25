@@ -2,8 +2,9 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ColumnsChart, DonutChart, brl } from './charts';
 import { Bill, CardInstallment, CardInvoice, Cfg, CATS, FIXED_CATS, OWN, PALETTE, Payout, Store, Supplier, Supply, Tx, monthLabel, shortMonth } from './store';
+import { buildFinancialReportPdf } from './report';
 
-type Tab = 'geral' | 'vendas' | 'custos' | 'insumos' | 'extrato' | 'projecoes' | 'logs';
+type Tab = 'geral' | 'vendas' | 'custos' | 'insumos' | 'extrato' | 'projecoes' | 'relatorios' | 'logs';
 
 @Component({
   selector: 'app-root',
@@ -23,15 +24,30 @@ export class AppComponent {
     { id: 'insumos', label: 'Notas de insumos', icon: 'inventory_2' },
     { id: 'extrato', label: 'Extrato', icon: 'account_balance_wallet' },
     { id: 'projecoes', label: 'Projeções', icon: 'insights' },
+    { id: 'relatorios', label: 'Relatórios', icon: 'summarize' },
     { id: 'logs', label: 'Atualizações', icon: 'history' },
   ];
   tab = signal<Tab>(this.readHash());
   confirmReset = signal(false);
   newMonth = '';
+  generatingReport = signal(false);
 
   private readHash(): Tab {
-    try { const h = location.hash.slice(1) as Tab; if (['geral', 'vendas', 'custos', 'insumos', 'extrato', 'projecoes', 'logs'].includes(h)) return h; } catch { /* */ }
+    try { const h = location.hash.slice(1) as Tab; if (['geral', 'vendas', 'custos', 'insumos', 'extrato', 'projecoes', 'relatorios', 'logs'].includes(h)) return h; } catch { /* */ }
     return 'geral';
+  }
+
+  /** Gera e baixa o relatório completo em PDF (disponível no cabeçalho em qualquer aba, e com mais detalhe na aba Relatórios). */
+  async gerarRelatorio() {
+    if (this.generatingReport()) return;
+    this.generatingReport.set(true);
+    try {
+      // dá um instante pro ícone de "gerando" aparecer antes do trabalho síncrono da montagem do PDF
+      await new Promise(r => setTimeout(r, 30));
+      buildFinancialReportPdf(this.s);
+    } finally {
+      this.generatingReport.set(false);
+    }
   }
   go(t: Tab) { this.tab.set(t); try { history.replaceState(null, '', '#' + t); } catch { /* */ } }
   num(v: unknown) { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; }

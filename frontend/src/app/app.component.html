@@ -28,6 +28,7 @@
         } @else if (s.mode() === 'local') {
           <div class="sync" title="Sem servidor: os dados ficam salvos só neste navegador."><span class="dot"></span><span class="sync-t">Modo local</span></div>
         }
+        <button type="button" class="icon-btn" (click)="gerarRelatorio()" [disabled]="generatingReport()" aria-label="Gerar relatório em PDF" title="Gerar relatório em PDF"><span class="mi" [class.spin]="generatingReport()">{{ generatingReport() ? 'progress_activity' : 'picture_as_pdf' }}</span></button>
         <button type="button" class="icon-btn" (click)="setTheme()" [attr.aria-label]="'Tema: ' + s.theme()" title="Alternar tema"><span class="mi">{{ themeIcon() }}</span></button>
       </div>
     </header>
@@ -577,6 +578,41 @@
           <article class="kpi"><h3>Pedidos/dia no equilíbrio</h3><p class="big">{{ n1(c.beOrders) }}</p></article>
         </div>
         <button type="button" class="btn" (click)="resetOv()"><span class="mi">undo</span>Voltar aos números reais</button>
+      </section>
+    }
+
+    <!-- ================= RELATÓRIOS ================= -->
+    @if (tab() === 'relatorios') {
+      <section class="card">
+        <h2><span class="mi">picture_as_pdf</span>Relatório completo de saúde financeira</h2>
+        <p class="note">Gera um PDF detalhado com a competência {{ monthLabel(s.month()) }}: resumo executivo, ponto de equilíbrio, vendas por canal,
+          custos fixos e folha, cartões de crédito, contas a pagar, fornecedores, repasses previstos e o histórico recente de atualizações —
+          tudo num arquivo só, pronto pra imprimir, enviar ao contador ou guardar como registro mensal.</p>
+        <button type="button" class="btn" (click)="gerarRelatorio()" [disabled]="generatingReport()">
+          <span class="mi" [class.spin]="generatingReport()">{{ generatingReport() ? 'progress_activity' : 'download' }}</span>
+          {{ generatingReport() ? 'Gerando…' : 'Gerar relatório em PDF' }}
+        </button>
+        <p class="note">O botão <span class="mi" style="vertical-align:-4px;font-size:16px">picture_as_pdf</span> no topo da tela gera o mesmo relatório a partir de qualquer aba, sempre com a competência selecionada no momento.</p>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <h2><span class="mi">preview</span>O que entra no relatório</h2>
+          <dl class="rows compact">
+            <div><dt>Resumo executivo</dt><dd>vendas, CMV, custos, lucro, margem, equilíbrio e projeção</dd></div>
+            <div><dt>Leitura do mês</dt><dd>os mesmos alertas da Visão geral</dd></div>
+            <div><dt>Vendas por canal</dt><dd>iFood, Anota AI etc.</dd></div>
+            <div><dt>Custos fixos e folha</dt><dd>item a item, com quem está recebendo de fato</dd></div>
+            <div><dt>Cartões de crédito</dt><dd>faturas em aberto e parcelas em andamento</dd></div>
+            <div><dt>Contas a pagar</dt><dd>vencidas, a vencer, repasses previstos e o saldo da semana</dd></div>
+            <div><dt>Fornecedores</dt><dd>prazo de pagamento cadastrado</dd></div>
+            <div><dt>Histórico recente</dt><dd>últimos 12 lançamentos/correções da aba Atualizações</dd></div>
+          </dl>
+        </article>
+        <article class="card">
+          <h2><span class="mi">schedule</span>Última geração</h2>
+          <p class="empty">O relatório é gerado na hora, direto no seu navegador — nada fica salvo no servidor. Gere de novo sempre que precisar de uma versão atualizada.</p>
+        </article>
       </section>
     }
 

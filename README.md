@@ -65,6 +65,28 @@ Veja `.env.example` — nunca commitar o `.env` real (já está no `.gitignore`)
 | `DASH_USER` / `DASH_PASSWORD` | Login do painel (HTTP Basic Auth via nginx) |
 | `WEBHOOK_TOKEN` | Token secreto na URL dos webhooks — gere com `openssl rand -hex 24` |
 | `PLUGGY_CLIENT_ID` / `PLUGGY_CLIENT_SECRET` / `PLUGGY_ITEM_IDS` | Credenciais do [Pluggy](https://dashboard.pluggy.ai) (open banking) |
+| `WHATSAPP_ENABLED` e demais `WHATSAPP_*` / `EVOLUTION_*` | Alertas por WhatsApp (opcional) — veja a seção abaixo |
+
+## Alertas por WhatsApp (opcional)
+
+Manda um resumo automático pelo WhatsApp quando tem boleto vencido, fatura de cartão perto de vencer, ou
+repasse previsto não cobrindo os boletos da semana. Usa o [Evolution API](https://github.com/EvolutionAPI/evolution-api)
+(gateway não-oficial, conecta a um número de WhatsApp de verdade via QR code) — serve bem pra alertas internos de
+baixo volume; não é o canal oficial da Meta, então não é recomendado para mensagens em massa ou marketing.
+
+1. No `.env`, defina `WHATSAPP_ENABLED=true`, gere `EVOLUTION_API_KEY` e `EVOLUTION_DB_PASSWORD`
+   (`openssl rand -hex 24` cada um) e preencha `WHATSAPP_NUMBERS` com os números que devem receber o alerta
+   (formato internacional sem símbolos, separados por vírgula: `5544999998888,5544988887777`).
+2. Rode o instalador normalmente (`windows/install.bat` ou `server/setup.sh`) — com `WHATSAPP_ENABLED=true`,
+   ele já sobe o Evolution API junto.
+3. Conecte o número de WhatsApp: abra `https://SEU_SERVIDOR_TAILSCALE:8081` (só acessível pela sua rede
+   Tailscale) com o header `apikey: SEU_EVOLUTION_API_KEY`, crie a instância `dashboard` e escaneie o QR code
+   com o WhatsApp que vai mandar os alertas (Configurações → Aparelhos conectados, no celular).
+4. Pronto — todo dia, no horário definido em `WHATSAPP_ALERT_HOUR` (padrão 8h), o backend confere boletos e
+   faturas e manda o resumo. Pra testar na hora sem esperar o horário: `curl -X POST http://127.0.0.1:3000/api/whatsapp/test` no servidor (ou pela rede Tailscale).
+
+Isso não cria lançamentos nem responde mensagens — é só aviso, numa direção só, por enquanto. Um bot que também
+recebe comando por WhatsApp ("lança boleto X") é um passo seguinte, mais trabalhoso.
 
 ## Desenvolvimento local
 

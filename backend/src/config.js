@@ -15,5 +15,14 @@ export const config = {
     initialDays: Number(process.env.PLUGGY_INITIAL_DAYS ?? 90),
   },
   seedInitial: (process.env.SEED_INITIAL ?? 'true') === 'true',
+  whatsapp: {
+    enabled: (process.env.WHATSAPP_ENABLED ?? 'false') === 'true',
+    numbers: list(process.env.WHATSAPP_NUMBERS),             // formato internacional sem símbolos, ex: 5544999998888
+    alertHour: Number(process.env.WHATSAPP_ALERT_HOUR ?? 8),  // hora do dia (fuso configurado acima) para o resumo diário
+    dueSoonDays: Number(process.env.WHATSAPP_DUE_SOON_DAYS ?? 2),
+    evolutionUrl: (process.env.EVOLUTION_API_URL ?? '').replace(/\/+$/, ''),
+    evolutionApiKey: process.env.EVOLUTION_API_KEY ?? '',
+    evolutionInstance: process.env.EVOLUTION_INSTANCE ?? 'dashboard',
+  },
   need,
 };

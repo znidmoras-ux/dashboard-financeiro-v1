@@ -66,5 +66,56 @@ services:
           sleep 86400
         done
 
+  # --- Alertas por WhatsApp (opcional) ---
+  # Só sobe com: docker compose --profile whatsapp up -d (o setup.sh faz isso sozinho se WHATSAPP_ENABLED=true no .env).
+  # Gateway não-oficial (conecta via QR code ao WhatsApp de verdade) — serve bem pra alertas internos de baixo volume;
+  # não é o canal oficial da Meta, então não use para mensagens em massa ou marketing.
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.7
+    profiles: ["whatsapp"]
+    restart: unless-stopped
+    environment:
+      SERVER_URL: http://127.0.0.1:8081
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?defina EVOLUTION_API_KEY no .env}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}@evolution-db:5432/evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379
+    volumes:
+      - evolution_instances:/evolution/instances
+    ports:
+      - "127.0.0.1:8081:8080"   # só a própria máquina — é aqui que você escaneia o QR code (ver README)
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+
+  evolution-db:
+    image: postgres:16-alpine
+    profiles: ["whatsapp"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}
+    volumes:
+      - evolution_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  evolution-redis:
+    image: redis:alpine
+    profiles: ["whatsapp"]
+    restart: unless-stopped
+    volumes:
+      - evolution_redis:/data
+
 volumes:
   pgdata:
+  evolution_instances:
+  evolution_pgdata:
+  evolution_redis:

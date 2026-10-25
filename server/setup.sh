@@ -62,8 +62,10 @@ say "4/6 Baixando imagens e subindo o sistema"
 cd "$APP"
 GU="$(get GHCR_USER || true)"; GT="$(get GHCR_TOKEN || true)"
 if [ -n "$GT" ]; then printf '%s' "$GT" | docker login ghcr.io -u "$GU" --password-stdin; fi
-docker compose pull
-docker compose up -d --remove-orphans
+PROFILE=()
+[ "$(get WHATSAPP_ENABLED || true)" = "true" ] && PROFILE=(--profile whatsapp)
+docker compose "${PROFILE[@]}" pull
+docker compose "${PROFILE[@]}" up -d --remove-orphans
 [ -n "$GT" ] && docker logout ghcr.io >/dev/null || true
 rm -f "$INPUT" "$HOME/.dashboard-compose.yml"
 

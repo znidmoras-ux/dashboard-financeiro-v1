@@ -6,6 +6,7 @@ import { migrate, pool, q } from './db.js';
 import { applyRules, loadRules, seedRules } from './rules.js';
 import { autoSales, reprocessOrders, saveOrder } from './orders.js';
 import { pluggyEnabled, syncPluggy } from './pluggy.js';
+import { runWhatsAppCheck, scheduleWhatsAppAlerts } from './notifications.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -123,6 +124,11 @@ app.delete('/api/rules/:id', wrap(async (req, res) => { await q('delete from rul
 app.post('/api/rules/apply', wrap(async (_req, res) => res.json({ changed: await applyRules() })));
 app.post('/api/orders/reprocess', wrap(async (_req, res) => res.json(await reprocessOrders())));
 app.post('/api/sync/pluggy', wrap(async (_req, res) => res.json(await runPluggy())));
+app.post('/api/whatsapp/test', wrap(async (_req, res) => {
+  if (!config.whatsapp.enabled) return res.status(400).json({ error: 'WHATSAPP_ENABLED não está ligado no .env' });
+  await runWhatsAppCheck();
+  res.json({ ok: true });
+}));
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ---------- tarefas ----------
@@ -157,6 +163,7 @@ export async function start() {
   await seed();
   if (!config.webhookToken) console.warn('WEBHOOK_TOKEN vazio: os webhooks ficam desativados.');
   if (pluggyEnabled()) { runPluggy(); setInterval(runPluggy, config.pluggy.syncMinutes * 60 * 1000); } else console.log('Pluggy desativada (chaves ou itens ausentes).');
+  if (config.whatsapp.enabled) { scheduleWhatsAppAlerts(); console.log(`Alertas de WhatsApp ativos (resumo diário às ${config.whatsapp.alertHour}h).`); } else console.log('Alertas de WhatsApp desativados (WHATSAPP_ENABLED).');
   const server = app.listen(config.port, () => console.log(`API na porta ${config.port}`));
   process.on('SIGTERM', () => server.close(() => pool.end()));
   return server;

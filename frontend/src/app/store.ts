@@ -166,7 +166,7 @@ export class Store {
         // no modo servidor o navegador guarda só preferências; os dados ficam no Postgres
         localStorage.setItem(KEY, JSON.stringify(mode === 'server' ? { m: d.m, th: d.th } : d));
       } catch { /* sem armazenamento */ }
-      if (mode === 'server') this.queueSettingsSave({ fixed: d.f, pay: d.p, sales: d.s, cfg: d.c });
+      if (mode === 'server') this.queueSettingsSave({ fixed: d.f, pay: d.p, sales: d.s, cfg: d.c, bills: d.b, payouts: d.py, cardInvoices: d.ci, cardInstallments: d.cp, suppliers: d.sup, changelog: d.log });
     });
     this.connect();
   }
@@ -180,11 +180,26 @@ export class Store {
 
   private async connect() {
     try {
-      const b = await this.api<{ settings: { fixed: Item[]; pay: Pay[]; sales: Sales[]; cfg: Cfg } | null; transactions: Tx[]; auto: Record<string, AutoMonth>; status: ServerStatus }>('/bootstrap');
+      type ServerSettings = {
+        fixed: Item[]; pay: Pay[]; sales: Sales[]; cfg: Cfg;
+        bills?: Bill[]; payouts?: Payout[]; cardInvoices?: CardInvoice[]; cardInstallments?: CardInstallment[]; suppliers?: Supplier[]; changelog?: ChangeLogEntry[];
+      };
+      const b = await this.api<{ settings: ServerSettings | null; transactions: Tx[]; auto: Record<string, AutoMonth>; status: ServerStatus }>('/bootstrap');
       if (b.settings) {
         this.fixed.set(b.settings.fixed); this.pay.set(b.settings.pay); this.sales.set(b.settings.sales);
         this.cfg.set({ ...SEED_CFG, ...b.settings.cfg });
-        this.lastSaved = JSON.stringify({ fixed: b.settings.fixed, pay: b.settings.pay, sales: b.settings.sales, cfg: this.cfg() });
+        // Campos adicionados depois (bills/cartões/fornecedores/changelog): se o servidor ainda não tem nada
+        // salvo pra eles (settings antigas), mantém a semente local em vez de apagar com um array vazio.
+        if (b.settings.bills) this.bills.set(b.settings.bills);
+        if (b.settings.payouts) this.payouts.set(b.settings.payouts);
+        if (b.settings.cardInvoices) this.cardInvoices.set(b.settings.cardInvoices);
+        if (b.settings.cardInstallments) this.cardInstallments.set(b.settings.cardInstallments);
+        if (b.settings.suppliers) this.suppliers.set(b.settings.suppliers);
+        if (b.settings.changelog) this.changelog.set(b.settings.changelog);
+        this.lastSaved = JSON.stringify({
+          fixed: b.settings.fixed, pay: b.settings.pay, sales: b.settings.sales, cfg: this.cfg(),
+          bills: this.bills(), payouts: this.payouts(), cardInvoices: this.cardInvoices(), cardInstallments: this.cardInstallments(), suppliers: this.suppliers(), changelog: this.changelog(),
+        });
       }
       this.tx.set(b.transactions); this.autoMap.set(b.auto); this.status.set(b.status);
       this.supplies.set(await this.api<Supply[]>('/supplies'));
@@ -208,7 +223,7 @@ export class Store {
     } catch { /* tenta de novo no próximo ciclo */ }
   }
 
-  private queueSettingsSave(body: { fixed: Item[]; pay: Pay[]; sales: Sales[]; cfg: Cfg }) {
+  private queueSettingsSave(body: { fixed: Item[]; pay: Pay[]; sales: Sales[]; cfg: Cfg; bills: Bill[]; payouts: Payout[]; cardInvoices: CardInvoice[]; cardInstallments: CardInstallment[]; suppliers: Supplier[]; changelog: ChangeLogEntry[] }) {
     const json = JSON.stringify(body);
     if (json === this.lastSaved) return;
     clearTimeout(this.saveTimer);

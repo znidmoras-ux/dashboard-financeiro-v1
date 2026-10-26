@@ -148,6 +148,10 @@ table.sup { min-width: 980px; } .sup td.tot { font-weight: 600; white-space: now
 .sup .w-num { width: 92px; } .sup .w-un { width: 64px; } .sup .w-nota { width: 84px; } .sup td:nth-child(1) { width: 140px; }
 .date { width: auto; border: 1px solid var(--line); background: var(--surface2); border-radius: 10px; }
 textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; resize: vertical; }
+.import-box { margin-top: 14px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; }
+.import-box summary { cursor: pointer; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.import-box summary::-webkit-details-marker { display: none; }
+.import-box textarea { margin: 10px 0; }
 .btn.file { position: relative; overflow: hidden; } .btn.file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .pctcell { white-space: nowrap; } .pbar { display: inline-block; width: 54px; height: 6px; border-radius: 99px; background: var(--surface2); margin-right: 8px; vertical-align: middle; } .pbar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 table.bal { min-width: 560px; }

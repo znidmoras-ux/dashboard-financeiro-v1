@@ -110,6 +110,22 @@ export class AppComponent {
     this.newBillSupplierId.set(null); this.newBillAmount.set(0); this.newBillNote.set(''); this.newBillOrderDate.set(this.today0);
   }
 
+  // ---- repasses: importar linhas coladas (ex.: relatório de conciliação do iFood) ----
+  importPayoutText = ''; importPayoutMsg = signal('');
+  doImportPayouts() {
+    const rows: { date: string; amount: number; note: string }[] = []; let skipped = 0;
+    for (const line of this.importPayoutText.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      const c = line.split(line.includes('\t') ? '\t' : ';').map(x => x.trim());
+      const date = this.isoDate(c[0]), amount = this.brNum(c[1]);
+      if (!date || !amount) { skipped++; continue; }
+      rows.push({ date, amount, note: c[2] || 'Repasse iFood (importado)' });
+    }
+    this.s.importPayouts(rows);
+    this.importPayoutMsg.set(`${rows.length} repasse(s) importado(s)${skipped ? `, ${skipped} linha(s) ignorada(s) (formato incorreto)` : ''}.`);
+    if (rows.length) this.importPayoutText = '';
+  }
+
   // ---- custos ----
   costItems = computed(() => this.s.fixedByCat());
   planned = computed(() => this.s.fixedTotal() + this.s.payActiveTotal());

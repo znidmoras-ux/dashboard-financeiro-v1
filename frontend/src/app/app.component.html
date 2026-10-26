@@ -256,6 +256,16 @@
         </div>
         <button type="button" class="btn" (click)="s.addPayout()"><span class="mi">add</span>Novo repasse</button>
         <p class="note">O iFood paga cerca de 25 dias depois da venda, sempre às quartas. Lance aqui os valores do relatório de conciliação (Vendas → Receitas) conforme eles saem, para acompanhar se cobrem os boletos da semana.</p>
+
+        <details class="import-box">
+          <summary><span class="mi">content_paste</span>Importar vários repasses colados de uma vez</summary>
+          <p class="note">Cole uma linha por repasse: <code>data; valor; observação</code> (ou copiado direto de uma planilha/Excel, com Tab entre as colunas).
+            Ex.: <code>21/10/2026; 469,01; Repasse iFood</code>. A observação é opcional.</p>
+          <textarea rows="4" [(ngModel)]="importPayoutText" placeholder="21/10/2026; 469,01; Repasse iFood
+28/10/2026; 692,38; Repasse iFood"></textarea>
+          <button type="button" class="btn" (click)="doImportPayouts()" [disabled]="!importPayoutText.trim()"><span class="mi">upload</span>Importar</button>
+          @if (importPayoutMsg()) { <p class="note">{{ importPayoutMsg() }}</p> }
+        </details>
       </section>
 
       <section class="card">

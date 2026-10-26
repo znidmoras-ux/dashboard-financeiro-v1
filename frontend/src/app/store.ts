@@ -93,6 +93,7 @@ const SEED_SUPPLIERS: Supplier[] = [
 // Histórico de lançamentos/correções feitos no dashboard — toda vez que um dado financeiro for criado, editado
 // ou corrigido por aqui, registra uma linha. Mais recente primeiro.
 const SEED_CHANGELOG: ChangeLogEntry[] = [
+  { id: -4, date: '2026-10-26', area: 'Repasses', description: 'Criado importador de repasses colados (data; valor; observação) na aba Contas a pagar — evita digitar manualmente o relatório de conciliação do iFood toda semana.' },
   { id: -3, date: '2026-10-25', area: 'Relatórios', description: 'Criada aba "Relatórios" + botão no topo da tela para gerar um PDF completo da saúde financeira (resumo, equilíbrio, custos, cartões, contas a pagar, fornecedores e histórico).' },
   { id: -2, date: '2026-10-25', area: 'Infra', description: 'Corrigido bug real no docker-compose: variáveis do WhatsApp (EVOLUTION_*) quebravam a instalação de qualquer um, mesmo sem usar WhatsApp. Corrigida também vulnerabilidade alta no body-parser (backend).' },
   { id: -1, date: '2026-10-24', area: 'WhatsApp', description: 'Criados alertas proativos por WhatsApp: resumo diário de boleto vencido, fatura perto de vencer e repasse da semana não cobrindo os boletos (via Evolution API, opcional).' },
@@ -325,6 +326,8 @@ export class Store {
     this.addBill({ supplier: sup.name, amount, dueDate: due.toISOString().slice(0, 10), note: note || `Prazo do fornecedor: ${sup.termDays} dias.` });
   }
   addPayout() { this.payouts.update(l => [{ id: nid(), date: this.today.toISOString().slice(0, 10), amount: 0, note: '' }, ...l]); }
+  /** Importa vários repasses colados de uma vez (ex.: do relatório de conciliação do iFood). */
+  importPayouts(rows: Omit<Payout, 'id'>[]) { if (rows.length) this.payouts.update(l => [...rows.map(r => ({ id: nid(), ...r })), ...l]); }
   addCardInvoice() { this.cardInvoices.update(l => [{ id: nid(), bank: '', total: 0, minPayment: 0, dueDate: this.today.toISOString().slice(0, 10), status: 'aberta' }, ...l]); }
   addCardInstallment() { this.cardInstallments.update(l => [{ id: nid(), cardBank: '', supplier: '', description: '', amount: 0, current: 1, total: 1, startDate: this.today.toISOString().slice(0, 10) }, ...l]); }
   async addSupply(base?: Partial<Supply>) {

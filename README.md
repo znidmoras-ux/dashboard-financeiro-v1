@@ -150,9 +150,56 @@ pra confirmar que está no ar.
 
 - **VMware Workstation/ESXi**: mesma ideia — crie uma VM Ubuntu Server com rede em modo bridge
   (pra pegar IP da rede local) e siga a partir do passo 5 acima.
-- **WSL2 com systemd**: funciona, mas é mais frágil num servidor (a instância para se ninguém
-  tiver sessão aberta no Windows, e serviços do `systemd` dentro do WSL exigem configuração extra).
-  Só recomendado pra testar rapidamente, não para produção.
+- **WSL2**: veja a seção abaixo — mais rápido de montar, mas só recomendado pra testar, não para produção.
+
+### Testar rápido no Windows 10/11 com WSL2 (sem criar VM)
+
+Pra só testar o sistema agora, sem passar pelo Hyper-V, dá pra rodar dentro do **WSL2**
+(o "Linux dentro do Windows"), direto no mesmo PC onde você vai rodar o `install.bat`.
+**Não é recomendado deixar assim de vez** — se o PC reiniciar, hibernar ou desligar, o sistema
+para até você abrir o Ubuntu do WSL de novo. Quando quiser algo permanente, migre para a
+VM Hyper-V (acima) ou um servidor/VPS de verdade — o `install.bat` funciona igual, só muda o endereço.
+
+1. **Instalar o WSL com Ubuntu** — PowerShell **como Administrador**:
+   ```powershell
+   wsl --install -d Ubuntu-24.04
+   ```
+   Reinicia se pedir. Depois, abra **"Ubuntu"** no menu Iniciar — na primeira vez ele pede pra
+   criar um usuário e senha Linux (ex.: usuário `ubuntu`). **Anote esse usuário**, é o que vai
+   usar no instalador.
+
+2. **Ativar o systemd dentro do WSL** (o `setup.sh` precisa dele para gerenciar Docker/Tailscale/SSH).
+   Dentro da janela do Ubuntu:
+   ```bash
+   sudo tee /etc/wsl.conf > /dev/null <<'EOF'
+   [boot]
+   systemd=true
+   EOF
+   ```
+   Feche a janela do Ubuntu. No **PowerShell** (fora do WSL):
+   ```powershell
+   wsl --shutdown
+   ```
+   Abra o **"Ubuntu"** de novo no menu Iniciar — ele reinicia já com o systemd ativo.
+
+3. **Instalar e ligar o SSH dentro do WSL** (é por aqui que o instalador do Windows vai conectar):
+   ```bash
+   sudo apt update && sudo apt install -y openssh-server
+   sudo systemctl enable --now ssh
+   sudo systemctl status ssh   # confirme que aparece "active (running)"
+   ```
+
+4. **Rodar o instalador** — no Windows, abra a pasta `windows\` e dê duplo clique em **`install.bat`**:
+   - Endereço do servidor: **`localhost`** (o WSL2 encaminha automaticamente pro Windows local;
+     se não conectar, use o IP que aparece em `ip a` dentro do Ubuntu — algo como `172.x.x.x`).
+   - Usuário SSH: o que você criou no passo 1 (ex.: `ubuntu`).
+   - Porta SSH: `22` (padrão).
+   - O resto, responda normalmente (veja a seção [Instalar num servidor novo](#instalar-num-servidor-novo-windows--linux) acima).
+
+5. Ele instala Docker + Tailscale **dentro do WSL** e sobe o sistema lá, igual numa VM de verdade.
+
+> Pra rodar de novo depois de reiniciar o PC: abra o app **"Ubuntu"** no menu Iniciar (isso
+> acorda o WSL e os serviços voltam sozinhos, graças ao systemd) antes de tentar acessar o painel.
 
 #### Atualizar depois
 

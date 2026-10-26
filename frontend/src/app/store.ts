@@ -93,6 +93,7 @@ const SEED_SUPPLIERS: Supplier[] = [
 // Histórico de lançamentos/correções feitos no dashboard — toda vez que um dado financeiro for criado, editado
 // ou corrigido por aqui, registra uma linha. Mais recente primeiro.
 const SEED_CHANGELOG: ChangeLogEntry[] = [
+  { id: -5, date: '2026-10-26', area: 'Infra', description: 'Corrigido bug no instalador do Windows: acentos apareciam quebrados (faltava BOM UTF-8 no install.ps1). Mensagem de erro de conexão SSH ficou mais clara.' },
   { id: -4, date: '2026-10-26', area: 'Repasses', description: 'Criado importador de repasses colados (data; valor; observação) na aba Contas a pagar — evita digitar manualmente o relatório de conciliação do iFood toda semana.' },
   { id: -3, date: '2026-10-25', area: 'Relatórios', description: 'Criada aba "Relatórios" + botão no topo da tela para gerar um PDF completo da saúde financeira (resumo, equilíbrio, custos, cartões, contas a pagar, fornecedores e histórico).' },
   { id: -2, date: '2026-10-25', area: 'Infra', description: 'Corrigido bug real no docker-compose: variáveis do WhatsApp (EVOLUTION_*) quebravam a instalação de qualquer um, mesmo sem usar WhatsApp. Corrigida também vulnerabilidade alta no body-parser (backend).' },

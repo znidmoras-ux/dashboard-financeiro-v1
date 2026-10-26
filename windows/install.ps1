@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
   Instalador do Dashboard Executivo para servidor Linux (Ubuntu/Debian) via SSH + Tailscale.
   Rode via install.bat (duplo clique) ou: powershell -ExecutionPolicy Bypass -File install.ps1
@@ -17,6 +17,13 @@
 #>
 
 $ErrorActionPreference = 'Stop'
+# Força UTF-8 na saída do console — sem isso, o Windows PowerShell clássico (5.1) exibe
+# acentos quebrados (ex. "EndereÃ§o") em consoles com codepage diferente de UTF-8.
+try {
+  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+  $OutputEncoding = [System.Text.Encoding]::UTF8
+  chcp 65001 > $null
+} catch { }
 $Root = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path (Join-Path $Root 'docker-compose.yml'))) { $Root = $PSScriptRoot }  # fallback se movido pra fora do repo
 
@@ -87,7 +94,16 @@ $sshBase = @('-p', $SshPort) + $sshKeyArgs + @('-o', 'StrictHostKeyChecking=acce
 
 Say 'Testando conexão SSH...'
 & ssh @sshBase "$SshUser@$ServerHost" 'echo ok' 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) { Fail "Não consegui conectar em $SshUser@$ServerHost na porta $SshPort. Confira o endereço, usuário e chave/senha." }
+if ($LASTEXITCODE -ne 0) {
+  Fail @"
+Não consegui conectar em $SshUser@$ServerHost na porta $SshPort. Causas mais comuns:
+  - Esse é o IP/hostname da VM ou servidor UBUNTU (não do seu PC Windows)?
+  - O Ubuntu Server já está instalado e com o "OpenSSH server" habilitado nele?
+  - O usuário existe de verdade NESSA máquina Linux (ex: "ubuntu") — não é o seu usuário do Windows?
+  - A VM/servidor está ligada e na mesma rede (dá pra confirmar com: ping $ServerHost)?
+Veja o passo a passo no README, seção "Servidor Windows Server em vez de Ubuntu/Debian?".
+"@
+}
 Write-Host 'Conexão OK.'
 
 # ---------- 2. imagens (GHCR) ----------

@@ -35,11 +35,14 @@ if ! tailscale status >/dev/null 2>&1; then
   # Sem tag por padrão: "--advertise-tags" só funciona se a tag já estiver cadastrada na política (ACL)
   # da sua conta Tailscale — a maioria das contas pessoais não tem isso configurado, e tentar usa uma
   # tag inexistente derruba a autorização. Quem quiser usar tags configura manualmente depois.
+  # --reset: descarta qualquer tentativa anterior "pendurada" (ex.: uma tentativa com tag que falhou
+  # antes) — sem isso, o tailscale recusa mudar os parâmetros e pede pra repetir exatamente a tentativa
+  # anterior ou usar --reset, o que travava o instalador numa segunda tentativa.
   if [ -n "$KEY" ]; then
-    tailscale up --ssh --authkey="$KEY"
+    tailscale up --ssh --reset --authkey="$KEY"
   else
     echo "Abra o link abaixo no navegador para autorizar este servidor na sua rede Tailscale:"
-    tailscale up --ssh
+    tailscale up --ssh --reset
   fi
 else
   tailscale set --ssh || true

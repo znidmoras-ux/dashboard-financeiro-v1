@@ -4,6 +4,10 @@
 set -euo pipefail
 
 INPUT="${INSTALL_ENV:-$HOME/.dashboard-install.env}"
+# Os arquivos chegam na pasta do usuário SSH (via scp), mas este script roda como root via sudo —
+# e sob sudo, $HOME vira /root, não a pasta de quem conectou. UPLOAD_HOME (passado pelo instalador
+# do Windows) corrige isso; sem ele (uso manual, já como root), cai de volta no $HOME normal.
+SRC_HOME="${UPLOAD_HOME:-$HOME}"
 APP=/opt/dashboard
 say() { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*"; }
@@ -51,7 +55,7 @@ HOST="$(tailscale status --json | python3 -c 'import json,sys; print(json.load(s
 
 say "3/6 Arquivos do sistema em $APP"
 mkdir -p "$APP/backups"
-install -m 0644 "$HOME/.dashboard-compose.yml" "$APP/docker-compose.yml"
+install -m 0644 "$SRC_HOME/.dashboard-compose.yml" "$APP/docker-compose.yml"
 touch "$APP/.env"; chmod 600 "$APP/.env"
 # Só acrescenta o que falta: segredos já existentes nunca são trocados. IMAGE_PREFIX e TAG sempre atualizam.
 while IFS= read -r line; do
@@ -82,7 +86,7 @@ fi
 docker compose "${PROFILE[@]}" pull
 docker compose "${PROFILE[@]}" up -d --remove-orphans
 [ -n "$GT" ] && docker logout ghcr.io >/dev/null || true
-rm -f "$INPUT" "$HOME/.dashboard-compose.yml"
+rm -f "$INPUT" "$SRC_HOME/.dashboard-compose.yml"
 
 say "5/6 Esperando a API responder"
 OK=0

@@ -181,7 +181,7 @@ finally {
 
 # ---------- roda o setup no servidor ----------
 Say '6/6 — Rodando o instalador no servidor (pode levar alguns minutos)'
-& ssh @sshBase -t "$SshUser@$ServerHost" 'chmod +x ~/setup.sh && sudo INSTALL_ENV=$HOME/.dashboard-install.env bash ~/setup.sh'
+& ssh @sshBase -t "$SshUser@$ServerHost" 'chmod +x ~/setup.sh && sudo INSTALL_ENV=$HOME/.dashboard-install.env UPLOAD_HOME=$HOME bash ~/setup.sh'
 $setupExit = $LASTEXITCODE
 
 # ---------- salva localmente pra reaproveitar da próxima vez (sem GHCR/Tailscale, que não devem persistir) ----------

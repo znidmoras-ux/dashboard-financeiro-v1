@@ -32,11 +32,14 @@ say "2/6 Tailscale"
 if ! command -v tailscale >/dev/null 2>&1; then curl -fsSL https://tailscale.com/install.sh | sh; fi
 if ! tailscale status >/dev/null 2>&1; then
   KEY="$(get TS_AUTHKEY || true)"
+  # Sem tag por padrão: "--advertise-tags" só funciona se a tag já estiver cadastrada na política (ACL)
+  # da sua conta Tailscale — a maioria das contas pessoais não tem isso configurado, e tentar usa uma
+  # tag inexistente derruba a autorização. Quem quiser usar tags configura manualmente depois.
   if [ -n "$KEY" ]; then
-    tailscale up --ssh --advertise-tags=tag:server --authkey="$KEY" || { warn "Sem a tag tag:server na política (ACL). Entrando sem tag."; tailscale up --ssh --authkey="$KEY"; }
+    tailscale up --ssh --authkey="$KEY"
   else
     echo "Abra o link abaixo no navegador para autorizar este servidor na sua rede Tailscale:"
-    tailscale up --ssh --advertise-tags=tag:server || tailscale up --ssh
+    tailscale up --ssh
   fi
 else
   tailscale set --ssh || true

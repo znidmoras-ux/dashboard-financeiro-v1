@@ -91,6 +91,9 @@ if ($SshKeyPath) {
   $sshKeyArgs = @('-i', $SshKeyPath)
 }
 $sshBase = @('-p', $SshPort) + $sshKeyArgs + @('-o', 'StrictHostKeyChecking=accept-new')
+# scp usa "-P" maiúsculo pra porta (diferente do ssh, que usa "-p" minúsculo) — com "-p" o scp
+# interpreta como "preservar datas" (sem argumento) e trata a porta como se fosse um arquivo a copiar.
+$scpBase = @('-P', $SshPort) + $sshKeyArgs + @('-o', 'StrictHostKeyChecking=accept-new')
 
 Say 'Testando conexão SSH...'
 & ssh @sshBase "$SshUser@$ServerHost" 'echo ok' 2>$null | Out-Null
@@ -165,11 +168,11 @@ try {
   Set-Content -Path $installEnvFile -Value $installEnvLines -NoNewline:$false -Encoding utf8
 
   Say '5/6 — Enviando arquivos para o servidor'
-  & scp @sshBase (Join-Path $Root 'docker-compose.yml') "${SshUser}@${ServerHost}:~/.dashboard-compose.yml"
+  & scp @scpBase (Join-Path $Root 'docker-compose.yml') "${SshUser}@${ServerHost}:~/.dashboard-compose.yml"
   if ($LASTEXITCODE -ne 0) { Fail 'Falha ao enviar docker-compose.yml.' }
-  & scp @sshBase (Join-Path $Root 'server/setup.sh') "${SshUser}@${ServerHost}:~/setup.sh"
+  & scp @scpBase (Join-Path $Root 'server/setup.sh') "${SshUser}@${ServerHost}:~/setup.sh"
   if ($LASTEXITCODE -ne 0) { Fail 'Falha ao enviar setup.sh.' }
-  & scp @sshBase $installEnvFile "${SshUser}@${ServerHost}:~/.dashboard-install.env"
+  & scp @scpBase $installEnvFile "${SshUser}@${ServerHost}:~/.dashboard-install.env"
   if ($LASTEXITCODE -ne 0) { Fail 'Falha ao enviar a configuração.' }
 }
 finally {

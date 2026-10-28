@@ -41,9 +41,11 @@ async function fetchItemData(itemId, from, rules) {
   const accounts = (await get(`/accounts?itemId=${itemId}`)).results ?? [];
   let inserted = 0, seen = 0;
   for (const acc of accounts) {
-    for (let page = 1, pages = 1; page <= pages; page++) {
-      const res = await get(`/transactions?accountId=${acc.id}&from=${from}&pageSize=500&page=${page}`);
-      pages = res.totalPages ?? 1;
+    // GET /transactions (paginado por page) está deprecated — a MeuPluggy já devolve 410 Gone nele.
+    // GET /v2/transactions pagina por cursor: "next" vem pronto como query string, ou null no fim.
+    let next = `/v2/transactions?accountId=${acc.id}&dateFrom=${from}`;
+    while (next) {
+      const res = await get(next);
       for (const t of res.results ?? []) {
         seen++;
         const amount = signedAmount(t);
@@ -57,6 +59,7 @@ async function fetchItemData(itemId, from, rules) {
           [t.id, String(t.date).slice(0, 10), bank, desc, amount, classify(desc, amount, rules)]);
         if (r.rows[0].inserted) inserted++;
       }
+      next = res.next ? `/v2/transactions${res.next}` : null;
     }
   }
   return { inserted, seen };

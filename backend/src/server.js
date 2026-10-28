@@ -5,7 +5,7 @@ import { config } from './config.js';
 import { migrate, pool, q } from './db.js';
 import { applyRules, loadRules, seedRules } from './rules.js';
 import { autoSales, reprocessOrders, saveOrder } from './orders.js';
-import { pluggyEnabled, syncPluggy } from './pluggy.js';
+import { deletePluggyTransactions, pluggyEnabled, syncPluggy } from './pluggy.js';
 import { runWhatsAppCheck, scheduleWhatsAppAlerts } from './notifications.js';
 
 const app = express();
@@ -31,8 +31,17 @@ app.post('/webhooks/anotaai/:token', limited, tokenOk, wrap(async (req, res) => 
   res.json({ ok: true });   // sempre 200: o payload bruto já está salvo e pode ser reprocessado
 }));
 app.post('/webhooks/pluggy/:token', limited, tokenOk, wrap(async (req, res) => {
-  res.json({ ok: true });
-  runPluggy().catch(() => {});
+  res.json({ ok: true });   // responde primeiro, processa depois
+  const { event, itemId, transactionIds } = req.body ?? {};
+  if (event === 'transactions/deleted' && Array.isArray(transactionIds)) {
+    await deletePluggyTransactions(transactionIds).catch((e) => console.error('Pluggy delete:', e.message));
+    return;
+  }
+  if (['item/created', 'item/updated', 'item/login_succeeded'].includes(event) && itemId) {
+    runPluggy(itemId).catch(() => {});   // ressincroniza só o item que mudou, não tudo
+    return;
+  }
+  if (event) console.log('Pluggy webhook (sem ação automática):', event, itemId ?? '');
 }));
 
 // ---------- API do painel (acessível só pela rede Tailscale, atrás de senha no nginx) ----------
@@ -132,11 +141,11 @@ app.post('/api/whatsapp/test', wrap(async (_req, res) => {
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ---------- tarefas ----------
-async function runPluggy() {
+async function runPluggy(onlyItemId) {
   try {
-    const r = await syncPluggy();
+    const r = await syncPluggy(onlyItemId);
     if (!r.skipped) { await applyRules(); await q(`insert into sync_log (source,last_run,last_ok,message) values ('pluggy',now(),now(),$1)
-      on conflict (source) do update set last_run=now(), last_ok=now(), message=$1`, [`${r.inserted} novos de ${r.seen}`]); }
+      on conflict (source) do update set last_run=now(), last_ok=now(), message=$1`, [`${r.inserted} novos de ${r.seen} · ${JSON.stringify(r.perItem)}`]); }
     return r;
   } catch (e) {
     console.error('Sync Pluggy:', e.message);

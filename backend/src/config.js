@@ -11,7 +11,7 @@ export const config = {
     clientId: process.env.PLUGGY_CLIENT_ID ?? '',
     clientSecret: process.env.PLUGGY_CLIENT_SECRET ?? '',
     itemIds: list(process.env.PLUGGY_ITEM_IDS),
-    syncMinutes: Number(process.env.PLUGGY_SYNC_MINUTES ?? 15),
+    syncMinutes: Number(process.env.PLUGGY_SYNC_MINUTES ?? 360), // 6h: é só rede de segurança — o webhook é o gatilho principal
     initialDays: Number(process.env.PLUGGY_INITIAL_DAYS ?? 90),
   },
   seedInitial: (process.env.SEED_INITIAL ?? 'true') === 'true',

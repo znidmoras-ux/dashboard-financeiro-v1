@@ -25,6 +25,15 @@ test('classificação por regra e fallback', () => {
   assert.equal(classify('FULANO', -5, rules), 'Saída a classificar');
   assert.equal(classify('FULANO', 5, rules), 'Entrada a classificar');
 });
+test('sem regra, usa a categoria da Pluggy em vez de descartar', () => {
+  const rules = [{ pattern: 'ifood', category: 'Receita de vendas / plataforma' }];
+  assert.equal(classify('PADARIA DO BAIRRO', -20, rules, 'Food delivery'), 'Pluggy: Food delivery');
+  assert.equal(classify('PADARIA DO BAIRRO', -20, rules, ''), 'Saída a classificar');
+});
+test('regra de texto tem prioridade sobre a categoria da Pluggy', () => {
+  const rules = [{ pattern: 'ifood', category: 'Receita de vendas / plataforma' }];
+  assert.equal(classify('IFOODCOM AGENCIA', 10, rules, 'Transfers'), 'Receita de vendas / plataforma');
+});
 test('sinal das transações da Pluggy vem do tipo', () => {
   assert.equal(signedAmount({ type: 'DEBIT', amount: -10 }), -10);
   assert.equal(signedAmount({ type: 'DEBIT', amount: 10 }), -10);

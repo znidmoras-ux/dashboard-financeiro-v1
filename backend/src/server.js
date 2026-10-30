@@ -145,7 +145,7 @@ async function runPluggy(onlyItemId) {
   try {
     const r = await syncPluggy(onlyItemId);
     if (!r.skipped) { await applyRules(); await q(`insert into sync_log (source,last_run,last_ok,message) values ('pluggy',now(),now(),$1)
-      on conflict (source) do update set last_run=now(), last_ok=now(), message=$1`, [`${r.inserted} novos de ${r.seen} · ${JSON.stringify(r.perItem)}`]); }
+      on conflict (source) do update set last_run=now(), last_ok=now(), message=$1`, [`${r.inserted} novos de ${r.seen}${r.billsPaid ? ` · ${r.billsPaid} boleto(s) baixado(s) automaticamente` : ''} · ${JSON.stringify(r.perItem)}`]); }
     return r;
   } catch (e) {
     console.error('Sync Pluggy:', e.message);

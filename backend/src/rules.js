@@ -21,10 +21,13 @@ export const DEFAULT_RULES = [
   ...KEYWORDS_COMPRAS.map((k) => [k, COMPRAS]),
 ];
 
-/** Retorna a categoria da primeira regra que casar; sem regra, "a classificar" conforme o sinal. */
-export function classify(description, amount, rules) {
+/** Retorna a categoria da primeira regra que casar; sem regra, usa a categoria que a própria
+ *  Pluggy já devolve na transação (ex.: "Food delivery", "Utilities") em vez de descartá-la;
+ *  só na ausência de ambas cai em "a classificar" conforme o sinal. */
+export function classify(description, amount, rules, pluggyCategory) {
   const d = norm(description);
   for (const r of rules) if (d.includes(norm(r.pattern))) return r.category;
+  if (pluggyCategory) return `Pluggy: ${pluggyCategory}`;
   return amount >= 0 ? 'Entrada a classificar' : 'Saída a classificar';
 }
 
@@ -40,14 +43,22 @@ export async function seedRules() {
   for (const [pattern, category] of DEFAULT_RULES) await q('insert into rules (pattern, category, position) values ($1,$2,$3)', [pattern, category, pos++]);
 }
 
-/** Reclassifica tudo que não foi categorizado manualmente. */
+/** Reclassifica tudo que não foi categorizado manualmente, aplicando só regras de texto que
+ *  efetivamente casaram. Importante: nunca rebaixa um lançamento que já tem uma categoria melhor
+ *  (ex.: a categoria que a própria Pluggy devolveu, gravada na hora do sync) de volta pra
+ *  "a classificar" só porque nenhuma regra de texto bateu — isso era um bug que apagava a
+ *  categorização da Pluggy no sync seguinte. */
 export async function applyRules() {
   const rules = await loadRules();
-  const { rows } = await q('select id, description, amount, category from transactions where category_manual = false');
+  const { rows } = await q('select id, description, category from transactions where category_manual = false');
   let changed = 0;
   for (const t of rows) {
-    const cat = classify(t.description, t.amount, rules);
-    if (cat !== t.category) { await q('update transactions set category=$1 where id=$2', [cat, t.id]); changed++; }
+    const d = norm(t.description);
+    const rule = rules.find((r) => d.includes(norm(r.pattern)));
+    if (rule && rule.category !== t.category) {
+      await q('update transactions set category=$1 where id=$2', [rule.category, t.id]);
+      changed++;
+    }
   }
   return changed;
 }

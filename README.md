@@ -228,6 +228,30 @@ Veja `.env.example` — nunca commitar o `.env` real (já está no `.gitignore`)
 | `WEBHOOK_TOKEN` | Token secreto na URL dos webhooks — gere com `openssl rand -hex 24` |
 | `PLUGGY_CLIENT_ID` / `PLUGGY_CLIENT_SECRET` / `PLUGGY_ITEM_IDS` | Credenciais do [Pluggy](https://dashboard.pluggy.ai) (open banking) |
 | `WHATSAPP_ENABLED` e demais `WHATSAPP_*` / `EVOLUTION_*` | Alertas por WhatsApp (opcional) — veja a seção abaixo |
+| `ASSISTANT_ENABLED` / `OLLAMA_MODEL` | Chat local de dicas de gestão (opcional) — veja a seção abaixo |
+
+## Assistente de gestão por chat (opcional)
+
+O chat usa o Ollama no próprio servidor, sem cobrança por chamada nem envio de indicadores a um provedor de IA.
+O modelo padrão é `qwen2.5:1.5b`; ele exige memória e CPU do servidor e pode responder mais devagar. O contexto
+enviado contém somente indicadores resumidos do painel, não lançamentos individuais do extrato. As respostas
+são informativas e devem ser conferidas.
+
+1. No `.env` do servidor, defina `ASSISTANT_ENABLED=true` e `OLLAMA_MODEL=qwen2.5:1.5b`.
+2. Na pasta `/opt/dashboard`, baixe e inicie o serviço:
+   ```bash
+   sudo docker compose --profile assistant pull ollama backend frontend
+   sudo docker compose --profile assistant up -d ollama backend frontend
+   ```
+3. Baixe o modelo (a primeira vez pode demorar e requer internet):
+   ```bash
+   sudo docker compose exec ollama ollama pull qwen2.5:1.5b
+   ```
+4. Abra ou recarregue o painel e selecione **Assistente IA**. Sem o perfil habilitado, o restante do dashboard
+   continua funcionando normalmente.
+
+O volume Docker `ollama_data` mantém o modelo após reinicializações. Para desativar, mude
+`ASSISTANT_ENABLED=false` no `.env` e recrie o backend; não remova o volume se quiser manter o modelo baixado.
 
 ## Alertas por WhatsApp (opcional)
 
@@ -266,6 +290,10 @@ cd frontend && npm install && npm start
 - `.github/workflows/deploy.yml`: em todo push na `main`, builda e publica as imagens no GHCR
   (reaproveitando o `ci.yml`). O deploy no servidor em si é manual — rode o instalador de novo
   (`windows/install.bat` ou `server/setup.sh`) para atualizar a versão em produção.
+- O deploy automático usa os secrets `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_USER` e
+  `DEPLOY_HOST`. `DEPLOY_HOST` deve ser o IP Tailscale do servidor (`100.x.y.z`) ou seu hostname
+  MagicDNS — não o IP público/LAN. O usuário e a tag `tag:ci` também precisam estar autorizados
+  pela política SSH da tailnet. O workflow resolve o destino para o IP Tailscale antes de abrir o SSH.
 
 ## Segurança
 

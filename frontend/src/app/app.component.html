@@ -651,6 +651,65 @@
         <p class="note">Toda correção ou lançamento importante feito no dashboard fica registrado aqui, com data — serve de auditoria do que mudou no caixa ao longo do tempo.</p>
       </section>
     }
+    @if (tab() === 'assistente') {
+      <section class="assistant card">
+        <div class="assistant-head">
+          <div>
+            <h2><span class="mi">forum</span>Assistente de gestão</h2>
+            <p class="note">Converse sobre a saúde da operação. A cada pergunta, o assistente recebe os indicadores atuais do painel.</p>
+          </div>
+          <div class="assistant-status-wrap">
+            @if (assistantStatus(); as status) {
+              <span class="assistant-status" [class.good]="status.available && status.installed" [class.bad]="!status.enabled || !status.available || status.installed === false">
+                <span class="mi">{{ status.available && status.installed ? 'check_circle' : 'info' }}</span>
+                @if (!status.enabled) { Desativado }
+                @else if (!status.available) { Ollama indisponível }
+                @else if (status.installed === false) { Modelo não instalado }
+                @else { Modelo local pronto }
+              </span>
+            }
+            <button type="button" class="ghost assistant-check" (click)="loadAssistantStatus()" [disabled]="assistantStatusBusy()">{{ assistantStatusBusy() ? 'Verificando…' : 'Verificar' }}</button>
+          </div>
+        </div>
+        @if (s.mode() !== 'server') {
+          <p class="assistant-notice">Conecte o painel ao servidor para usar o assistente.</p>
+        } @else {
+          @if (assistantStatus(); as status) {
+            @if (!status.enabled) {
+              <p class="assistant-notice">O assistente está desativado. Configure <code>ASSISTANT_ENABLED=true</code> no servidor e inicie o perfil Docker <code>assistant</code>.</p>
+            } @else if (!status.available) {
+              <p class="assistant-notice">Não foi possível conectar ao Ollama. Verifique se o serviço está ativo no servidor.</p>
+            } @else if (status.installed === false) {
+              <p class="assistant-notice">Baixe o modelo no servidor com <code>sudo docker compose exec ollama ollama pull {{ status.model }}</code>.</p>
+            }
+          }
+          @else { <p class="assistant-notice">Verificando a conexão com o modelo local…</p> }
+        }
+        <div class="assistant-messages" aria-live="polite">
+          @if (!assistantMessages().length) {
+            <div class="assistant-welcome">
+              <span class="mi">lightbulb</span>
+              <p>Peça uma análise da operação ou faça uma pergunta. O assistente consulta vendas, custos, contas próximas do vencimento e status das integrações — sem enviar o extrato detalhado.</p>
+              <button type="button" class="btn" [disabled]="assistantBusy() || !assistantStatus()?.enabled || !assistantStatus()?.available || assistantStatus()?.installed === false" (click)="sendAssistantMessage('Analise a saúde da operação com os indicadores atuais. Traga os principais riscos e até três ações práticas, priorizadas.')">Analisar operação agora</button>
+            </div>
+          } @else {
+            @for (message of assistantMessages(); track $index) {
+              <article class="assistant-message" [class.user]="message.role === 'user'">
+                <b>{{ message.role === 'user' ? 'Você' : 'Assistente' }}</b>
+                <p>{{ message.content }}</p>
+              </article>
+            }
+          }
+          @if (assistantBusy()) { <p class="assistant-thinking"><span class="mi spin">progress_activity</span> Analisando os indicadores…</p> }
+        </div>
+        @if (assistantError()) { <p class="assistant-error" role="alert">{{ assistantError() }}</p> }
+        <form class="assistant-form" (ngSubmit)="sendAssistantMessage()">
+          <textarea name="assistantQuestion" [(ngModel)]="assistantDraft" maxlength="1200" rows="3" placeholder="Ex.: quais são os principais riscos de caixa desta semana?" [disabled]="assistantBusy() || s.mode() !== 'server'"></textarea>
+          <button type="submit" class="btn" [disabled]="assistantBusy() || !assistantDraft.trim() || !assistantStatus()?.enabled || !assistantStatus()?.available || assistantStatus()?.installed === false"><span class="mi">send</span> Enviar</button>
+        </form>
+        <p class="note">Modelo local gratuito via Ollama; respostas podem demorar e devem ser conferidas. O contexto enviado contém apenas indicadores resumidos.</p>
+      </section>
+    }
     <footer class="foot">Equilíbrio = custos fixos ÷ (1 − CMV%). Lucro real = vendas líquidas − CMV − custos fixos.</footer>
   </main>
 </div>

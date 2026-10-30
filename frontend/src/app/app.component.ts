@@ -1,10 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ColumnsChart, DonutChart, brl } from './charts';
-import { Bill, CardInstallment, CardInvoice, Cfg, CATS, FIXED_CATS, OWN, PALETTE, Payout, Store, Supplier, Supply, Tx, monthLabel, shortMonth } from './store';
+import { AssistantMessage, AssistantStatus, Bill, CardInstallment, CardInvoice, Cfg, CATS, FIXED_CATS, OWN, PALETTE, Payout, Store, Supplier, Supply, Tx, monthLabel, shortMonth } from './store';
 import { buildFinancialReportPdf } from './report';
 
-type Tab = 'geral' | 'vendas' | 'custos' | 'insumos' | 'extrato' | 'projecoes' | 'relatorios' | 'logs';
+type Tab = 'geral' | 'vendas' | 'custos' | 'insumos' | 'extrato' | 'projecoes' | 'relatorios' | 'assistente' | 'logs';
 
 @Component({
   selector: 'app-root',
@@ -25,15 +25,22 @@ export class AppComponent {
     { id: 'extrato', label: 'Extrato', icon: 'account_balance_wallet' },
     { id: 'projecoes', label: 'Projeções', icon: 'insights' },
     { id: 'relatorios', label: 'Relatórios', icon: 'summarize' },
+    { id: 'assistente', label: 'Assistente IA', icon: 'forum' },
     { id: 'logs', label: 'Atualizações', icon: 'history' },
   ];
   tab = signal<Tab>(this.readHash());
   confirmReset = signal(false);
   newMonth = '';
   generatingReport = signal(false);
+  assistantMessages = signal<AssistantMessage[]>([]);
+  assistantStatus = signal<AssistantStatus | null>(null);
+  assistantStatusBusy = signal(false);
+  assistantBusy = signal(false);
+  assistantError = signal('');
+  assistantDraft = '';
 
   private readHash(): Tab {
-    try { const h = location.hash.slice(1) as Tab; if (['geral', 'vendas', 'custos', 'insumos', 'extrato', 'projecoes', 'relatorios', 'logs'].includes(h)) return h; } catch { /* */ }
+    try { const h = location.hash.slice(1) as Tab; if (['geral', 'vendas', 'custos', 'insumos', 'extrato', 'projecoes', 'relatorios', 'assistente', 'logs'].includes(h)) return h; } catch { /* */ }
     return 'geral';
   }
 
@@ -49,7 +56,56 @@ export class AppComponent {
       this.generatingReport.set(false);
     }
   }
-  go(t: Tab) { this.tab.set(t); try { history.replaceState(null, '', '#' + t); } catch { /* */ } }
+  go(t: Tab) {
+    this.tab.set(t);
+    try { history.replaceState(null, '', '#' + t); } catch { /* */ }
+    if (t === 'assistente' && !this.assistantStatus()) this.loadAssistantStatus();
+  }
+  async loadAssistantStatus() {
+    if (this.assistantStatusBusy()) return;
+    this.assistantStatusBusy.set(true); this.assistantError.set('');
+    try { this.assistantStatus.set(await this.s.assistantStatus()); }
+    catch (error) { this.assistantError.set(error instanceof Error ? error.message : 'Não foi possível verificar o assistente.'); }
+    finally { this.assistantStatusBusy.set(false); }
+  }
+  assistantContext() {
+    const m = this.s.metrics(), bills = this.s.billStats(), status = this.s.status();
+    return {
+      month: this.s.month(), sales: m.net, grossSales: m.gross, profit: m.profit,
+      marginPercent: m.margin, cmvPercent: m.s.cmvPct, operatingCosts: m.costs,
+      breakEven: m.breakeven, projectedSales: m.projected, dailyRunRate: m.runRate,
+      daysRemaining: m.d.remaining, orders: m.s.orders, averageTicket: m.ticket,
+      overdueBills: bills.totalOverdue, billsDueIn7Days: bills.totalSoon,
+      payoutsIn7Days: bills.payoutsSoon, ordersInSystem: status?.orders ?? 0,
+      salesChannels: m.s.channels.slice(0, 5).map(channel => ({ name: channel.name, netSales: channel.net })),
+      integrations: {
+        pluggyEnabled: status?.pluggy ?? false,
+        lastBankSync: status?.sync?.['pluggy']?.lastOk ?? null,
+        lastOrderAt: status?.lastOrderAt ?? null,
+      },
+    };
+  }
+  async sendAssistantMessage(text = this.assistantDraft) {
+    const question = text.trim();
+    if (!question || this.assistantBusy()) return;
+    if (this.s.mode() !== 'server') {
+      this.assistantError.set('O assistente funciona quando o painel está conectado ao servidor.');
+      return;
+    }
+    this.assistantBusy.set(true); this.assistantError.set(''); this.assistantDraft = '';
+    const conversation = [...this.assistantMessages(), { role: 'user' as const, content: question }];
+    this.assistantMessages.set(conversation);
+    try {
+      const { reply } = await this.s.assistantChat(conversation.slice(-12), this.assistantContext());
+      this.assistantMessages.update(messages => [...messages, { role: 'assistant', content: reply }]);
+    } catch (error) {
+      this.assistantMessages.update(messages => messages.slice(0, -1));
+      this.assistantDraft = question;
+      this.assistantError.set(error instanceof Error ? error.message : 'Não foi possível consultar o assistente.');
+    } finally {
+      this.assistantBusy.set(false);
+    }
+  }
   num(v: unknown) { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; }
   pct(v: number, d = 1) { return v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%'; }
   n1(v: number) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
@@ -268,4 +324,8 @@ export class AppComponent {
   pctFmt = (v: number) => v.toFixed(1).replace('.', ',') + '%';
   toneOf(p: number) { return p >= 0.6 ? 'good' : p >= 0.25 ? 'warn' : 'bad'; }
   addMonth() { if (/^\d{4}-\d{2}$/.test(this.newMonth)) { this.s.addMonth(this.newMonth); this.newMonth = ''; } }
+
+  constructor() {
+    if (this.tab() === 'assistente') this.loadAssistantStatus();
+  }
 }

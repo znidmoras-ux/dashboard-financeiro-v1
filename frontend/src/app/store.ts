@@ -16,6 +16,8 @@ export interface CardInvoice { id: number; bank: string; total: number; minPayme
 export interface CardInstallment { id: number; cardBank: string; supplier: string; description: string; amount: number; current: number; total: number; startDate: string; }
 export interface AutoMonth { channels: { name: string; net: number }[]; discounts: number; orders: number; }
 export interface ServerStatus { pluggy: boolean; lastOrderAt: string | null; orders: number; sync: Record<string, { lastRun: string; lastOk: string | null; message: string }>; }
+export interface AssistantMessage { role: 'user' | 'assistant'; content: string; }
+export interface AssistantStatus { enabled: boolean; available: boolean; installed?: boolean; model: string; }
 export interface Cfg { includePayments: boolean; targetProfit: number; excludeOwn: boolean; fees?: Record<string, number>; }
 
 export const OWN = 'Transferência própria / aporte-retirada';
@@ -179,8 +181,20 @@ export class Store {
   // ---------- servidor ----------
   private async api<T>(path: string, init?: RequestInit): Promise<T> {
     const r = await fetch('/api' + path, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } });
-    if (!r.ok) throw new Error(path + ' ' + r.status);
+    if (!r.ok) {
+      let message = path + ' ' + r.status;
+      try {
+        const body = await r.json();
+        if (typeof body?.error === 'string') message = body.error;
+      } catch { /* resposta sem JSON */ }
+      throw new Error(message);
+    }
     return r.json();
+  }
+
+  assistantStatus() { return this.api<AssistantStatus>('/assistant/status'); }
+  assistantChat(messages: AssistantMessage[], context: Record<string, unknown>) {
+    return this.api<{ reply: string }>('/assistant/chat', { method: 'POST', body: JSON.stringify({ messages, context }) });
   }
 
   private async connect() {

@@ -74,22 +74,51 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+      - name: Localizar servidor na tailnet
+        id: target
+        env:
+          SERVER_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          SERVER_IP="$(tailscale status --json | jq -r --arg host "$SERVER_HOST" '
+            [
+              .Peer[]?
+              | select(
+                  ((.HostName // "") | ascii_downcase) == ($host | ascii_downcase)
+                  or ((.DNSName // "" | ascii_downcase | sub("\\.$"; "")) == ($host | ascii_downcase | sub("\\.$"; "")))
+                  or ((.TailscaleIPs // []) | index($host))
+                )
+              | .TailscaleIPs[0] // empty
+            ]
+            | unique
+            | if length == 1 then .[0] else empty end
+          )"
+          if [ -z "$SERVER_IP" ]; then
+            echo "::error::DEPLOY_HOST não corresponde a um dispositivo único na tailnet. Use o IP Tailscale (100.x.y.z) ou o hostname MagicDNS do servidor."
+            exit 1
+          fi
+          echo "Servidor localizado na tailnet; usando o endereço Tailscale para SSH."
+          echo "host=$SERVER_IP" >> "$GITHUB_OUTPUT"
+          echo "Testando conectividade Tailscale..."
+          if ! timeout 15s tailscale ping "$SERVER_IP"; then
+            echo "::error::O servidor não respondeu pela Tailscale. Verifique se está online e autorizado na tailnet."
+            exit 1
+          fi
       - name: Atualizar via Tailscale SSH
         env:
-          SERVER: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          SERVER: ${{ secrets.DEPLOY_USER }}@${{ steps.target.outputs.host }}
           TAG: ${{ inputs.tag || github.sha }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # o token do GitHub (curto, só leitura de pacotes neste job) vai pelo stdin, nunca pela linha de comando
-          printf '%s' "$GHCR_TOKEN" | ssh -o StrictHostKeyChecking=accept-new "$SERVER" \
-            "docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null && cd /opt/dashboard && sed -i 's/^TAG=.*/TAG=$TAG/' .env && docker compose pull && docker compose up -d --remove-orphans && docker image prune -f >/dev/null && docker logout ghcr.io >/dev/null"
+          printf '%s' "$GHCR_TOKEN" | ssh -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2 -o StrictHostKeyChecking=accept-new "$SERVER" \
+            "docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null && cd /opt/dashboard && sed -i 's/^TAG=.*/TAG=$TAG/' .env && PROFILE='' && if grep -qx 'ASSISTANT_ENABLED=true' .env; then PROFILE='--profile assistant'; fi && docker compose \$PROFILE pull && docker compose \$PROFILE up -d --remove-orphans && if [ \"\$PROFILE\" = '--profile assistant' ]; then MODEL=\$(sed -n 's/^OLLAMA_MODEL=//p' .env | head -1); docker compose --profile assistant exec -T ollama ollama pull \"\${MODEL:-qwen2.5:1.5b}\"; fi && docker image prune -f >/dev/null && docker logout ghcr.io >/dev/null"
       - name: Verificar saúde
         env:
-          SERVER: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          SERVER: ${{ secrets.DEPLOY_USER }}@${{ steps.target.outputs.host }}
         run: |
           for i in $(seq 1 30); do
-            if ssh "$SERVER" "cd /opt/dashboard && docker compose exec -T backend wget -qO- http://127.0.0.1:3000/health" | grep -q '"ok":true'; then echo "API respondendo"; exit 0; fi
+            if ssh -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2 "$SERVER" "cd /opt/dashboard && docker compose exec -T backend wget -qO- http://127.0.0.1:3000/health" | grep -q '"ok":true'; then echo "API respondendo"; exit 0; fi
             sleep 5
           done
           echo "::error::A API não respondeu em 2,5 minutos. Para voltar: rode este workflow manualmente (Run workflow) com a tag do commit anterior."; exit 1

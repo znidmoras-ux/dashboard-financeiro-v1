@@ -15,6 +15,11 @@ export const config = {
     initialDays: Number(process.env.PLUGGY_INITIAL_DAYS ?? 90),
   },
   seedInitial: (process.env.SEED_INITIAL ?? 'true') === 'true',
+  assistant: {
+    enabled: (process.env.ASSISTANT_ENABLED ?? 'false') === 'true',
+    ollamaUrl: (process.env.OLLAMA_URL ?? 'http://ollama:11434').replace(/\/+$/, ''),
+    model: process.env.OLLAMA_MODEL ?? 'qwen2.5:1.5b',
+  },
   whatsapp: {
     enabled: (process.env.WHATSAPP_ENABLED ?? 'false') === 'true',
     numbers: list(process.env.WHATSAPP_NUMBERS),             // formato internacional sem símbolos, ex: 5544999998888

@@ -49,7 +49,7 @@ if ! tailscale status >/dev/null 2>&1; then
     tailscale up --ssh --reset
   fi
 else
-  tailscale set --ssh || true
+  tailscale set --ssh
 fi
 HOST="$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
 
@@ -83,8 +83,15 @@ if [ "$(get WHATSAPP_ENABLED || true)" = "true" ]; then
   fi
   PROFILE=(--profile whatsapp)
 fi
+if [ "$(get ASSISTANT_ENABLED || true)" = "true" ]; then
+  PROFILE+=(--profile assistant)
+fi
 docker compose "${PROFILE[@]}" pull
 docker compose "${PROFILE[@]}" up -d --remove-orphans
+if [ "$(get ASSISTANT_ENABLED || true)" = "true" ]; then
+  MODEL="$(grep -E '^OLLAMA_MODEL=' "$APP/.env" | head -1 | cut -d= -f2-)"
+  docker compose exec -T ollama ollama pull "${MODEL:-qwen2.5:1.5b}"
+fi
 [ -n "$GT" ] && docker logout ghcr.io >/dev/null || true
 rm -f "$INPUT" "$SRC_HOME/.dashboard-compose.yml"
 

@@ -29,6 +29,9 @@ services:
       POSTGRES_DB: dashboard
       POSTGRES_USER: dashboard
       TZ: America/Sao_Paulo
+      ASSISTANT_ENABLED: ${ASSISTANT_ENABLED:-false}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
     depends_on:
       db:
         condition: service_healthy
@@ -117,8 +120,18 @@ services:
     volumes:
       - evolution_redis:/data
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["assistant"]
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+
 volumes:
   pgdata:
   evolution_instances:
   evolution_pgdata:
   evolution_redis:
+  ollama_data:

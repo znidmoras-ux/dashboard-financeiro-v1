@@ -7,6 +7,7 @@ import { applyRules, loadRules, seedRules } from './rules.js';
 import { autoSales, reprocessOrders, saveOrder } from './orders.js';
 import { deletePluggyTransactions, pluggyEnabled, syncPluggy } from './pluggy.js';
 import { runWhatsAppCheck, scheduleWhatsAppAlerts } from './notifications.js';
+import { askOllama, AssistantInputError, cleanContext, cleanConversation, ollamaStatus } from './assistant.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -138,6 +139,40 @@ app.post('/api/whatsapp/test', wrap(async (_req, res) => {
   await runWhatsAppCheck();
   res.json({ ok: true });
 }));
+app.get('/api/assistant/status', async (_req, res) => {
+  res.json(await ollamaStatus({
+    enabled: config.assistant.enabled,
+    url: config.assistant.ollamaUrl,
+    model: config.assistant.model,
+  }));
+});
+app.post('/api/assistant/chat', async (req, res) => {
+  if (!config.assistant.enabled) return res.status(503).json({ error: 'Assistente desativado. Habilite ASSISTANT_ENABLED no .env do servidor.' });
+  let messages, context;
+  try {
+    messages = cleanConversation(req.body?.messages);
+    context = cleanContext(req.body?.context);
+  } catch (error) {
+    if (error instanceof AssistantInputError) return res.status(400).json({ error: error.message });
+    throw error;
+  }
+  try {
+    res.json({ reply: await askOllama({
+      messages,
+      context,
+      url: config.assistant.ollamaUrl,
+      model: config.assistant.model,
+    }) });
+  } catch (error) {
+    console.error('Assistente local indisponível:', error.message);
+    const timeout = error.name === 'TimeoutError' || error.name === 'AbortError';
+    res.status(timeout ? 504 : 503).json({
+      error: timeout
+        ? 'O modelo demorou demais para responder. Tente novamente em alguns instantes.'
+        : 'Não foi possível consultar o modelo local. Confira se o Ollama está ativo e se o modelo foi baixado.',
+    });
+  }
+});
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ---------- tarefas ----------

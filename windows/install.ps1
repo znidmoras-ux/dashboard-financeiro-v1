@@ -127,6 +127,10 @@ $PgPass = $saved['POSTGRES_PASSWORD']; if (-not $PgPass) { $PgPass = New-RandomS
 $DashUser = Read-Default 'Usuário de login do painel' ($(if ($saved['DASH_USER']) { $saved['DASH_USER'] } else { 'admin' }))
 $DashPass = $saved['DASH_PASSWORD']; if (-not $DashPass) { $DashPass = New-RandomSecret 20; Write-Host 'Gerada nova senha do painel.' } else { Write-Host 'Reaproveitando a senha do painel já salva no .env local.' }
 $WebhookToken = $saved['WEBHOOK_TOKEN']; if (-not $WebhookToken) { $WebhookToken = New-RandomSecret 48; Write-Host 'Gerado novo WEBHOOK_TOKEN.' } else { Write-Host 'Reaproveitando o WEBHOOK_TOKEN já salvo (as URLs do Anota AI/Pluggy não mudam).' }
+$assistantDefault = if ($saved['ASSISTANT_ENABLED'] -eq 'true') { 'S' } else { 'N' }
+$assistantChoice = Read-Default 'Ativar assistente local Ollama? (S/N)' $assistantDefault
+$AssistantEnabled = if ($assistantChoice -match '^[sS]') { 'true' } else { 'false' }
+$OllamaModel = Read-Default 'Modelo Ollama' $(if ($saved['OLLAMA_MODEL']) { $saved['OLLAMA_MODEL'] } else { 'qwen2.5:1.5b' })
 
 $PluggyId = $saved['PLUGGY_CLIENT_ID']; $PluggySecret = $saved['PLUGGY_CLIENT_SECRET']; $PluggyItems = $saved['PLUGGY_ITEM_IDS']
 if (-not $PluggyId) {
@@ -157,6 +161,8 @@ $installEnvLines = @(
   'PLUGGY_SYNC_MINUTES=360'
   'PLUGGY_INITIAL_DAYS=90'
   'SEED_INITIAL=true'
+  "ASSISTANT_ENABLED=$AssistantEnabled"
+  "OLLAMA_MODEL=$OllamaModel"
 )
 if ($GhcrUser) { $installEnvLines += "GHCR_USER=$GhcrUser"; $installEnvLines += "GHCR_TOKEN=$GhcrToken" }
 if ($TsAuthKey) { $installEnvLines += "TS_AUTHKEY=$TsAuthKey" }
@@ -199,6 +205,8 @@ $localEnvLines = @(
   'PLUGGY_SYNC_MINUTES=360'
   'PLUGGY_INITIAL_DAYS=90'
   'SEED_INITIAL=true'
+  "ASSISTANT_ENABLED=$AssistantEnabled"
+  "OLLAMA_MODEL=$OllamaModel"
 )
 Set-Content -Path $envPath -Value $localEnvLines -Encoding utf8
 Write-Host "`nConfiguração salva em $envPath para reaproveitar na próxima vez que rodar o instalador."

@@ -91,7 +91,7 @@ jobs:
             ]
             | unique
             | if length == 1 then .[0] else empty end
-          )"
+          ')"
           if [ -z "$SERVER_IP" ]; then
             echo "::error::DEPLOY_HOST não corresponde a um dispositivo único na tailnet. Use o IP Tailscale (100.x.y.z) ou o hostname MagicDNS do servidor."
             exit 1

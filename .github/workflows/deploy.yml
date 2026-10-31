@@ -83,6 +83,16 @@ jobs:
           # .env antes) — tira \r e espaços nas pontas aqui pra não repetir a história.
           SERVER_HOST="$(printf '%s' "$SERVER_HOST" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
           echo "DEPLOY_HOST tem ${#SERVER_HOST} caracteres (confira se bate com o esperado)."
+          # Um nó recém-entrado na tailnet (este runner, efêmero a cada execução) pode levar alguns
+          # segundos pra receber o netmap completo com os outros peers — a lista vinha vazia mesmo
+          # com o ACL liberado. Espera até aparecer pelo menos um peer, até 20s.
+          for i in $(seq 1 10); do
+            PEER_COUNT="$(tailscale status --json | jq '.Peer | length')"
+            [ "${PEER_COUNT:-0}" -gt 0 ] && break
+            echo "Netmap ainda sem peers (tentativa $i/10), aguardando..."
+            sleep 2
+          done
+          echo "Peers visíveis: ${PEER_COUNT:-0}"
           SERVER_IP="$(tailscale status --json | jq -r --arg host "$SERVER_HOST" '
             [
               .Peer[]?

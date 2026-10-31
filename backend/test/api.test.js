@@ -42,5 +42,33 @@ test('API ponta a ponta', { skip: !url }, async () => {
   assert.equal(list.find((x) => x.id === s1.id).quantity, 6); assert.equal(list.find((x) => x.id === s1.id).brand, 'Président');
   await j(`/api/supplies/${s1.id}`, { method: 'DELETE' });
   assert.equal((await j('/api/supplies')).body.some((x) => x.id === s1.id), false);
+
+  // fotos anexadas (lançamento rápido pelo celular)
+  const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  assert.equal((await j('/api/attachments', { method: 'POST', body: JSON.stringify({ dataUrl: 'lixo' }) })).status, 400);
+  const foto = (await j('/api/attachments', { method: 'POST', body: JSON.stringify({ dataUrl: pixel }) })).body;
+  assert.ok(Number.isInteger(foto.id));
+  const r2 = await fetch(`${base}/api/attachments/${foto.id}`);
+  assert.equal(r2.status, 200); assert.equal(r2.headers.get('content-type'), 'image/png');
+  assert.equal((await r2.arrayBuffer()).byteLength > 0, true);
+  assert.equal((await j('/api/attachments/999999')).status, 404);
+
+  // nota de insumo com foto anexada
+  const s2 = (await j('/api/supplies', { method: 'POST', body: JSON.stringify({ date: '2026-10-07', supplier: 'Verona', product: 'Pão', quantity: 10, price: 1.5, photoId: foto.id }) })).body;
+  assert.equal(s2.photoId, foto.id);
+
+  // boleto lançado pelo celular (rota dedicada, sem passar pelo PUT /api/settings inteiro)
+  assert.equal((await j('/api/bills', { method: 'POST', body: JSON.stringify({ amount: 0 }) })).status, 400);
+  const bill = (await j('/api/bills', { method: 'POST', body: JSON.stringify({ supplier: 'Energia', amount: 250.5, dueDate: '2026-11-05', photoId: foto.id }) })).body;
+  assert.equal(bill.status, 'aberto'); assert.equal(bill.source, 'celular'); assert.equal(bill.photoId, foto.id);
+  assert.ok((await j('/api/bootstrap')).body.settings.bills.some((x) => x.id === bill.id));
+
+  // condição de corrida: um save do painel (com settings "desatualizados", sem o boleto do celular)
+  // não pode apagar o boleto recém-lançado pelo celular
+  const s3 = (await j('/api/bootstrap')).body.settings;
+  const semBoleto = { ...s3, bills: s3.bills.filter((x) => x.id !== bill.id) }; // simula painel que carregou antes do boleto existir
+  await j('/api/settings', { method: 'PUT', body: JSON.stringify(semBoleto) });
+  assert.ok((await j('/api/bootstrap')).body.settings.bills.some((x) => x.id === bill.id), 'boleto do celular não deveria ter sido apagado pelo save do painel');
+
   server.close(); (await import('../src/db.js')).pool.end();
 });

@@ -6,9 +6,11 @@ export interface Item { id: number; name: string; cat: string; value: number; }
 export interface Pay { id: number; role: string; name: string; value: number; receiving: boolean; }
 export interface Chan { id: number; name: string; net: number; }
 export interface Sales { month: string; channels: Chan[]; discounts: number; orders: number; cmvPct: number; auto?: boolean; }
-export interface Supply { id: number; date: string; invoice: string; supplier: string; product: string; brand: string; unit: string; quantity: number; price: number; }
+export interface Supply { id: number; date: string; invoice: string; supplier: string; product: string; brand: string; unit: string; quantity: number; price: number; photoId?: number | null; }
 export interface Rule { id: number; pattern: string; category: string; }
-export interface Bill { id: number; supplier: string; amount: number; dueDate: string; status: 'aberto' | 'pago'; paidBy: string; note: string; }
+// photoId/source/createdAt só existem em boletos lançados pelo celular (POST /api/bills); nos lançados
+// pelo painel ficam undefined mesmo.
+export interface Bill { id: number; supplier: string; amount: number; dueDate: string; status: 'aberto' | 'pago'; paidBy: string; note: string; photoId?: number | null; source?: string; createdAt?: string; }
 export interface Payout { id: number; date: string; amount: number; note: string; }
 export interface Supplier { id: number; name: string; termDays: number; note: string; }
 export interface ChangeLogEntry { id: number; date: string; area: string; description: string; }
@@ -232,13 +234,21 @@ export class Store {
     }
   }
 
-  /** Atualiza extrato, vendas automáticas e status sem tocar nas configurações em edição. */
+  /** Atualiza extrato, vendas automáticas e status sem tocar nas configurações em edição.
+   *  Exceção: boletos lançados pelo celular (POST /api/bills) aparecem sozinhos aqui, sem precisar
+   *  recarregar a página — só adiciona os que ainda não existem localmente, nunca mexe nos outros. */
   async refresh() {
     if (this.mode() !== 'server' || this.txTimers.size) return;
     try {
-      const b = await this.api<{ transactions: Tx[]; auto: Record<string, AutoMonth>; status: ServerStatus }>('/bootstrap');
+      const b = await this.api<{ transactions: Tx[]; auto: Record<string, AutoMonth>; status: ServerStatus; settings?: { bills?: Bill[] } | null }>('/bootstrap');
       this.tx.set(b.transactions); this.autoMap.set(b.auto); this.status.set(b.status);
       this.supplies.set(await this.api<Supply[]>('/supplies'));
+      const incoming = b.settings?.bills?.filter((x) => x.source === 'celular') ?? [];
+      if (incoming.length) {
+        const knownIds = new Set(this.bills().map((x) => x.id));
+        const novos = incoming.filter((x) => !knownIds.has(x.id));
+        if (novos.length) { this.bills.update((l) => [...novos, ...l]); this.lastSaved = ''; } // força o próximo save a incluir os novos
+      }
     } catch { /* tenta de novo no próximo ciclo */ }
   }
 

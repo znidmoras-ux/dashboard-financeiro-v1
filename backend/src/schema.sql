@@ -59,6 +59,15 @@ create table if not exists sync_log (
   message text
 );
 
+-- fotos anexadas a lançamentos feitos pelo celular (nota de compra, boleto): guardadas no próprio
+-- Postgres, não em disco, pra entrarem de graça no backup diário que já existe.
+create table if not exists attachments (
+  id bigserial primary key,
+  mime text not null,
+  data bytea not null,
+  created_at timestamptz not null default now()
+);
+
 -- notas de insumos: uma linha por item comprado
 create table if not exists supplies (
   id bigserial primary key,
@@ -73,3 +82,4 @@ create table if not exists supplies (
   created_at timestamptz not null default now()
 );
 create index if not exists supplies_date_idx on supplies (date desc);
+alter table supplies add column if not exists photo_id bigint references attachments(id);

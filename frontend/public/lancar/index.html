@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Lançar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c35">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lançar">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" href="./icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f1f4f2; --surface: #ffffff; --surface2: #f6f8f7; --ink: #10261c; --muted: #5a6b62; --line: #e1e8e4;
+    --brand: #0f4c35; --brand-ink: #ffffff; --good: #14804a; --bad: #d12f2f; --good-bg: #e4f4ea; --bad-bg: #fbe9e9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0c1511; --surface: #131f19; --surface2: #182620; --ink: #e8f0ec; --muted: #9db0a5; --line: #243329;
+      --brand: #3fb985; --brand-ink: #06150d; --good: #4cc78a; --bad: #ff7b7b; --good-bg: #12301f; --bad-bg: #3a1a1a; }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 'Instrument Sans', system-ui, sans-serif;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  h1 { font: 700 20px/1.2 'Sora', sans-serif; margin: 0; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--brand); color: var(--brand-ink);
+    padding: 14px 16px calc(14px + env(safe-area-inset-top)); padding-top: calc(14px + env(safe-area-inset-top));
+    display: flex; align-items: center; justify-content: space-between; }
+  header small { display: block; opacity: .85; font-size: 12px; margin-top: 2px; }
+  main { max-width: 480px; margin: 0 auto; padding: 16px 16px 100px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+    font: 600 15px 'Instrument Sans', sans-serif; color: var(--muted); text-align: center; cursor: pointer; }
+  .tab.active { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+  label:first-child { margin-top: 0; }
+  input, select { width: 100%; padding: 13px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface2); color: var(--ink); font-size: 16px; }
+  input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .total { text-align: right; font: 700 18px 'Sora', sans-serif; margin-top: 12px; color: var(--brand); }
+  .photo-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 16px;
+    border: 2px dashed var(--line); border-radius: 12px; background: var(--surface2); color: var(--muted);
+    font-weight: 600; cursor: pointer; }
+  .photo-wrap { position: relative; }
+  .photo-wrap img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; display: block; }
+  .photo-remove { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.6); color: #fff; border: none;
+    border-radius: 999px; width: 32px; height: 32px; font-size: 16px; cursor: pointer; }
+  .submit { width: 100%; padding: 16px; border: none; border-radius: 12px; background: var(--brand); color: var(--brand-ink);
+    font: 700 16px 'Sora', sans-serif; margin-top: 16px; cursor: pointer; }
+  .submit:disabled { opacity: .6; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 10px; display: none; }
+  .err.show { display: block; }
+  .toast { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); max-width: 448px; margin: 0 auto;
+    background: var(--good-bg); color: var(--good); border: 1px solid var(--good); border-radius: 12px; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 600;
+    transform: translateY(140%); transition: transform .25s ease; z-index: 10; }
+  .toast.show { transform: translateY(0); }
+  .toast button { background: none; border: none; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; font-size: 14px; }
+  .count { text-align: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Lançar</h1><small id="subtitle">compra / insumo</small></div>
+  <span id="today" style="font-size:13px;opacity:.85"></span>
+</header>
+<main>
+  <div class="tabs">
+    <button type="button" class="tab active" data-tab="compra">📦 Compra</button>
+    <button type="button" class="tab" data-tab="boleto">🧾 Boleto</button>
+  </div>
+
+  <div class="card">
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+    <button type="button" class="photo-btn" id="photoBtn">📷 Tirar foto da nota</button>
+    <div class="photo-wrap" id="photoWrap" style="display:none">
+      <img id="photoPreview" alt="Foto da nota">
+      <button type="button" class="photo-remove" id="photoRemove">✕</button>
+    </div>
+  </div>
+
+  <!-- COMPRA -->
+  <form class="card" id="formCompra">
+    <label for="c-data">Data</label>
+    <input type="date" id="c-data" required>
+
+    <label for="c-forn">Fornecedor</label>
+    <input type="text" id="c-forn" placeholder="ex: Distribuidora Verona" required>
+
+    <label for="c-prod">Produto</label>
+    <input type="text" id="c-prod" placeholder="ex: Queijo mussarela" required>
+
+    <div class="row2">
+      <div>
+        <label for="c-qtd">Quantidade</label>
+        <input type="number" id="c-qtd" step="any" min="0" inputmode="decimal" value="1" required>
+      </div>
+      <div>
+        <label for="c-un">Unidade</label>
+        <select id="c-un">
+          <option value="un">un</option><option value="kg">kg</option><option value="g">g</option>
+          <option value="L">L</option><option value="ml">ml</option><option value="cx">cx</option>
+          <option value="pct">pct</option><option value="fd">fd</option><option value="dz">dz</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="c-preco">Valor unitário (R$)</label>
+    <input type="number" id="c-preco" step="0.01" min="0" inputmode="decimal" placeholder="0,00" required>
+    <div class="hint">preço de 1 un/kg/L — não o total da nota</div>
+
+    <label for="c-nota">Nº da nota (opcional)</label>
+    <input type="text" id="c-nota" placeholder="opcional">
+
+    <div class="total" id="c-total">Total: R$ 0,00</div>
+    <div class="err" id="c-err"></div>
+    <button type="submit" class="submit" id="c-submit">Salvar compra</button>
+  </form>
+
+  <!-- BOLETO -->
+  <form class="card" id="formBoleto" style="display:none">
+    <label for="b-forn">Fornecedor / conta</label>
+    <input type="text" id="b-forn" placeholder="ex: Copel, aluguel, fornecedor X" required>
+
+    <label for="b-valor">Valor (R$)</label>
+    <input type="number" id="b-valor" step="0.01" min="0.01" inputmode="decimal" placeholder="0,00" required>
+
+    <label for="b-venc">Vencimento</label>
+    <input type="date" id="b-venc" required>
+
+    <label for="b-obs">Observação (opcional)</label>
+    <input type="text" id="b-obs" placeholder="opcional">
+
+    <div class="err" id="b-err"></div>
+    <button type="submit" class="submit" id="b-submit">Salvar boleto</button>
+    <div class="hint">Pra editar ou excluir um boleto depois, use o painel no computador.</div>
+  </form>
+
+  <div class="count" id="count"></div>
+</main>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button type="button" id="toastUndo" style="display:none">desfazer</button></div>
+
+<script>
+(() => {
+  const today = () => new Date().toISOString().slice(0, 10);
+  document.getElementById('today').textContent = new Date().toLocaleDateString('pt-BR');
+  document.getElementById('c-data').value = today();
+  document.getElementById('b-venc').value = today();
+
+  // ---------- abas ----------
+  const tabs = document.querySelectorAll('.tab');
+  const forms = { compra: document.getElementById('formCompra'), boleto: document.getElementById('formBoleto') };
+  const subtitle = document.getElementById('subtitle');
+  tabs.forEach((t) => t.addEventListener('click', () => {
+    tabs.forEach((x) => x.classList.toggle('active', x === t));
+    const which = t.dataset.tab;
+    forms.compra.style.display = which === 'compra' ? '' : 'none';
+    forms.boleto.style.display = which === 'boleto' ? '' : 'none';
+    subtitle.textContent = which === 'compra' ? 'compra / insumo' : 'boleto / conta a pagar';
+  }));
+
+  // ---------- foto: captura + compressão antes de mandar ----------
+  let photoDataUrl = null;
+  const photoInput = document.getElementById('photoInput'), photoBtn = document.getElementById('photoBtn');
+  const photoWrap = document.getElementById('photoWrap'), photoPreview = document.getElementById('photoPreview');
+  photoBtn.addEventListener('click', () => photoInput.click());
+  document.getElementById('photoRemove').addEventListener('click', () => {
+    photoDataUrl = null; photoInput.value = ''; photoWrap.style.display = 'none'; photoBtn.style.display = '';
+  });
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+    photoBtn.textContent = '⏳ processando foto…';
+    try {
+      photoDataUrl = await compressImage(file);
+      photoPreview.src = photoDataUrl;
+      photoWrap.style.display = ''; photoBtn.style.display = 'none';
+    } catch (e) {
+      alert('Não consegui processar a foto: ' + e.message);
+    } finally {
+      photoBtn.textContent = '📷 Tirar foto da nota';
+    }
+  });
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('leitura falhou'));
+      reader.onload = () => { img.onerror = () => reject(new Error('imagem inválida')); img.onload = () => {
+        const maxDim = 1280;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      }; img.src = reader.result; };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---------- contador do dia (só pra feedback, não é fonte de verdade) ----------
+  const countEl = document.getElementById('count');
+  const todayKey = 'lancar-count-' + today();
+  const counts = JSON.parse(sessionStorage.getItem(todayKey) || '{"compra":0,"boleto":0}');
+  const renderCount = () => { countEl.textContent = `Hoje: ${counts.compra} compra(s) · ${counts.boleto} boleto(s) lançado(s)`; };
+  renderCount();
+  const bump = (kind) => { counts[kind]++; sessionStorage.setItem(todayKey, JSON.stringify(counts)); renderCount(); };
+
+  // ---------- toast ----------
+  const toast = document.getElementById('toast'), toastMsg = document.getElementById('toastMsg'), toastUndo = document.getElementById('toastUndo');
+  let toastTimer = null;
+  function showToast(msg, undoFn) {
+    toastMsg.textContent = msg;
+    toastUndo.style.display = undoFn ? '' : 'none';
+    toastUndo.onclick = async () => { if (undoFn) { await undoFn(); hideToast(); } };
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+  function hideToast() { toast.classList.remove('show'); }
+
+  async function uploadPhotoIfAny() {
+    if (!photoDataUrl) return null;
+    const r = await fetch('/api/attachments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dataUrl: photoDataUrl }) });
+    if (!r.ok) throw new Error('falha ao enviar a foto (' + r.status + ')');
+    return (await r.json()).id;
+  }
+  function resetPhoto() { photoDataUrl = null; photoInput.value = ''; photoWrap.style.display = 'none'; photoBtn.style.display = ''; }
+
+  // ---------- compra ----------
+  const cErr = document.getElementById('c-err');
+  const cQtd = document.getElementById('c-qtd'), cPreco = document.getElementById('c-preco'), cTotal = document.getElementById('c-total');
+  const brl = (n) => 'Total: R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const updateTotal = () => { cTotal.textContent = brl((Number(cQtd.value) || 0) * (Number(cPreco.value) || 0)); };
+  cQtd.addEventListener('input', updateTotal); cPreco.addEventListener('input', updateTotal);
+
+  document.getElementById('formCompra').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    cErr.classList.remove('show');
+    const btn = document.getElementById('c-submit'); btn.disabled = true; btn.textContent = 'Salvando…';
+    try {
+      const photoId = await uploadPhotoIfAny();
+      const body = {
+        date: document.getElementById('c-data').value,
+        supplier: document.getElementById('c-forn').value.trim(),
+        product: document.getElementById('c-prod').value.trim(),
+        quantity: Number(cQtd.value) || 0,
+        unit: document.getElementById('c-un').value,
+        price: Number(cPreco.value) || 0,
+        invoice: document.getElementById('c-nota').value.trim(),
+        photoId,
+      };
+      if (!body.supplier || !body.product || !(body.price >= 0)) throw new Error('preencha fornecedor, produto e valor');
+      const r = await fetch('/api/supplies', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error('o servidor recusou (' + r.status + ')');
+      const saved = await r.json();
+      bump('compra');
+      showToast('✅ Compra salva: ' + body.product, async () => {
+        await fetch('/api/supplies/' + saved.id, { method: 'DELETE' });
+        counts.compra = Math.max(0, counts.compra - 1); sessionStorage.setItem(todayKey, JSON.stringify(counts)); renderCount();
+      });
+      document.getElementById('c-forn').value = ''; document.getElementById('c-prod').value = '';
+      cQtd.value = '1'; cPreco.value = ''; document.getElementById('c-nota').value = ''; updateTotal();
+      resetPhoto();
+      document.getElementById('c-forn').focus();
+    } catch (e) {
+      cErr.textContent = e.message; cErr.classList.add('show');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Salvar compra';
+    }
+  });
+
+  // ---------- boleto ----------
+  const bErr = document.getElementById('b-err');
+  document.getElementById('formBoleto').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    bErr.classList.remove('show');
+    const btn = document.getElementById('b-submit'); btn.disabled = true; btn.textContent = 'Salvando…';
+    try {
+      const photoId = await uploadPhotoIfAny();
+      const body = {
+        supplier: document.getElementById('b-forn').value.trim(),
+        amount: Number(document.getElementById('b-valor').value) || 0,
+        dueDate: document.getElementById('b-venc').value,
+        note: document.getElementById('b-obs').value.trim(),
+        photoId,
+      };
+      if (!body.supplier || !(body.amount > 0)) throw new Error('preencha fornecedor e valor');
+      const r = await fetch('/api/bills', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error('o servidor recusou (' + r.status + ')');
+      bump('boleto');
+      showToast('✅ Boleto salvo: ' + body.supplier, null);
+      document.getElementById('b-forn').value = ''; document.getElementById('b-valor').value = '';
+      document.getElementById('b-venc').value = today(); document.getElementById('b-obs').value = '';
+      resetPhoto();
+      document.getElementById('b-forn').focus();
+    } catch (e) {
+      bErr.textContent = e.message; bErr.classList.add('show');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Salvar boleto';
+    }
+  });
+})();
+</script>
+</body>
+</html>

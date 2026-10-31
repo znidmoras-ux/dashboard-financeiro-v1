@@ -28,6 +28,7 @@
         } @else if (s.mode() === 'local') {
           <div class="sync" title="Sem servidor: os dados ficam salvos só neste navegador."><span class="dot"></span><span class="sync-t">Modo local</span></div>
         }
+        <a class="icon-btn" href="./lancar/" target="_blank" rel="noopener" aria-label="Lançar compra ou boleto pelo celular" title="Lançar pelo celular"><span class="mi">photo_camera</span></a>
         <button type="button" class="icon-btn" (click)="gerarRelatorio()" [disabled]="generatingReport()" aria-label="Gerar relatório em PDF" title="Gerar relatório em PDF"><span class="mi" [class.spin]="generatingReport()">{{ generatingReport() ? 'progress_activity' : 'picture_as_pdf' }}</span></button>
         <button type="button" class="icon-btn" (click)="setTheme()" [attr.aria-label]="'Tema: ' + s.theme()" title="Alternar tema"><span class="mi">{{ themeIcon() }}</span></button>
       </div>
@@ -223,7 +224,7 @@
         </div>
         <div class="scroll">
           <table class="edit bills">
-            <thead><tr><th>Status</th><th>Fornecedor</th><th class="r">Valor</th><th>Vencimento</th><th>Pago por</th><th>Observação</th><th></th></tr></thead>
+            <thead><tr><th>Status</th><th>Fornecedor</th><th class="r">Valor</th><th>Vencimento</th><th>Pago por</th><th>Observação</th><th></th><th></th></tr></thead>
             <tbody>@for (b of s.bills(); track b.id) {
               <tr>
                 <td><button type="button" class="pill" [class]="billTone(b)" (click)="togglePaid(b)">{{ billLabel(b) }}</button></td>
@@ -232,9 +233,10 @@
                 <td><input type="date" [id]="'b-d-' + b.id" [ngModel]="b.dueDate" (ngModelChange)="s.upd(s.bills, b.id, { dueDate: $event })" aria-label="Vencimento"/></td>
                 <td><input type="text" class="w-bank" [id]="'b-p-' + b.id" [ngModel]="b.paidBy" (ngModelChange)="s.upd(s.bills, b.id, { paidBy: $event })" aria-label="Pago por" placeholder="banco / sócio"/></td>
                 <td><input type="text" [id]="'b-o-' + b.id" [ngModel]="b.note" (ngModelChange)="s.upd(s.bills, b.id, { note: $event })" aria-label="Observação"/></td>
+                <td class="x">@if (b.photoId) { <a class="icon-btn sm" [href]="'/api/attachments/' + b.photoId" target="_blank" rel="noopener" aria-label="Ver foto do boleto" title="Ver foto"><span class="mi">photo_camera</span></a> }</td>
                 <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.bills, b.id)" aria-label="Excluir conta"><span class="mi">delete</span></button></td>
               </tr>
-            } @empty { <tr><td colspan="7" class="empty">Nenhuma conta lançada.</td></tr> }</tbody>
+            } @empty { <tr><td colspan="8" class="empty">Nenhuma conta lançada.</td></tr> }</tbody>
           </table>
         </div>
         <button type="button" class="btn" (click)="s.addBill()"><span class="mi">add</span>Novo boleto</button>
@@ -406,7 +408,7 @@
         <datalist id="dl-un"><option value="un"></option><option value="kg"></option><option value="g"></option><option value="L"></option><option value="ml"></option><option value="cx"></option><option value="pct"></option><option value="fd"></option><option value="dz"></option></datalist>
         <div class="scroll">
           <table class="edit sup">
-            <thead><tr><th>Data</th><th>Nota</th><th>Fornecedor</th><th>Produto</th><th>Marca</th><th class="r">Qtde</th><th>Un</th><th class="r">Valor un. (R$)</th><th class="r">Total</th><th></th></tr></thead>
+            <thead><tr><th>Data</th><th>Nota</th><th>Fornecedor</th><th>Produto</th><th>Marca</th><th class="r">Qtde</th><th>Un</th><th class="r">Valor un. (R$)</th><th class="r">Total</th><th></th><th></th></tr></thead>
             <tbody>
               @for (r of supPage(); track r.id) {
                 <tr>
@@ -419,13 +421,14 @@
                   <td><input type="text" list="dl-un" class="w-un" [id]="'s-u-' + r.id" [ngModel]="r.unit" (ngModelChange)="s.upd(s.supplies, r.id, { unit: $event })" aria-label="Unidade"/></td>
                   <td class="r"><input type="number" step="any" min="0" class="w-num" [id]="'s-v-' + r.id" [ngModel]="r.price" (ngModelChange)="s.upd(s.supplies, r.id, { price: num($event) })" aria-label="Valor unitário"/></td>
                   <td class="r tot">{{ brl(total(r)) }}</td>
+                  <td class="x">@if (r.photoId) { <a class="icon-btn sm" [href]="'/api/attachments/' + r.photoId" target="_blank" rel="noopener" aria-label="Ver foto da nota" title="Ver foto"><span class="mi">photo_camera</span></a> }</td>
                   <td class="x"><button type="button" class="icon-btn sm" (click)="s.del(s.supplies, r.id)" aria-label="Excluir item"><span class="mi">delete</span></button></td>
                 </tr>
               } @empty {
-                <tr><td colspan="10" class="empty">Nenhum item neste filtro. Use "Novo item" ou cole as linhas das notas na área de importação abaixo.</td></tr>
+                <tr><td colspan="11" class="empty">Nenhum item neste filtro. Use "Novo item" ou cole as linhas das notas na área de importação abaixo.</td></tr>
               }
             </tbody>
-            <tfoot><tr><td colspan="8">Total do filtro</td><td class="r">{{ brl(ss.total) }}</td><td></td></tr></tfoot>
+            <tfoot><tr><td colspan="8">Total do filtro</td><td class="r">{{ brl(ss.total) }}</td><td></td><td></td></tr></tfoot>
           </table>
         </div>
         <div class="pager">

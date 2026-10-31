@@ -79,6 +79,10 @@ jobs:
         env:
           SERVER_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
+          # já fomos mordidos por CRLF escondido num secret colado do Windows (foi o que quebrou o
+          # .env antes) — tira \r e espaços nas pontas aqui pra não repetir a história.
+          SERVER_HOST="$(printf '%s' "$SERVER_HOST" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          echo "DEPLOY_HOST tem ${#SERVER_HOST} caracteres (confira se bate com o esperado)."
           SERVER_IP="$(tailscale status --json | jq -r --arg host "$SERVER_HOST" '
             [
               .Peer[]?
@@ -93,7 +97,9 @@ jobs:
             | if length == 1 then .[0] else empty end
           ')"
           if [ -z "$SERVER_IP" ]; then
-            echo "::error::DEPLOY_HOST não corresponde a um dispositivo único na tailnet. Use o IP Tailscale (100.x.y.z) ou o hostname MagicDNS do servidor."
+            echo "Dispositivos visíveis nesta tailnet (pra comparar com o DEPLOY_HOST configurado):"
+            tailscale status --json | jq -r '.Peer[]? | "  - HostName=\(.HostName // "?")  DNSName=\(.DNSName // "?")  IP=\((.TailscaleIPs // [])[0] // "?")"'
+            echo "::error::DEPLOY_HOST não corresponde a um dispositivo único na tailnet. Use o IP Tailscale (100.x.y.z) ou o hostname MagicDNS do servidor — veja a lista acima."
             exit 1
           fi
           echo "Servidor localizado na tailnet; usando o endereço Tailscale para SSH."
